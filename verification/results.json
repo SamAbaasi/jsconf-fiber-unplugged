@@ -1,0 +1,122 @@
+{
+  "chromium": "153.0.8010.12",
+  "react": "19.3.1",
+  "scheduler": "0.28.0",
+  "results": {
+    "scheduling.production": {
+      "A_click_setState": {
+        "schedulerTasks": [],
+        "continuations": 0,
+        "sliceDurationsMs": [],
+        "maxSliceMs": 0,
+        "rowRenders": 2000
+      },
+      "B_default_setTimeout": {
+        "schedulerTasks": [
+          "Normal"
+        ],
+        "continuations": 0,
+        "sliceDurationsMs": [
+          211.2
+        ],
+        "maxSliceMs": 211.2,
+        "rowRenders": 2000
+      },
+      "C_startTransition": {
+        "schedulerTasks": [
+          "Normal",
+          "Normal"
+        ],
+        "continuations": 41,
+        "sliceDurationsMs": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "maxSliceMs": 8,
+        "rowRenders": 2000
+      },
+      "D_mousemove": {
+        "schedulerTasks": [
+          "UserBlocking"
+        ],
+        "continuations": 0,
+        "sliceDurationsMs": [
+          208.9
+        ],
+        "maxSliceMs": 208.9,
+        "rowRenders": 2000
+      },
+      "T2a_transition_no_interrupt": {
+        "rowsRenderedFor_a": 1500,
+        "expected": 1500
+      },
+      "T2b_click_interrupts_transition": {
+        "rowsRenderedBeforeClick": 240,
+        "totalRowsRenderedFor_b": 1740,
+        "restarted": true
+      },
+      "T2c_default_update_mid_transition": {
+        "rowsRenderedBefore": 295,
+        "totalRowsRenderedFor_c": 3000,
+        "interruptedTransition": false
+      },
+      "T3_startTransition_callback_sync": "before → inside callback → after",
+      "T4a_click": [
+        "effect v=1",
+        "my microtask (queued after setState)",
+        "my setTimeout 0"
+      ],
+      "T4b_click_with_transition": [
+        "my microtask",
+        "effect v=2",
+        "my setTimeout 0"
+      ],
+      "T4c_default_timer": [
+        "my microtask",
+        "effect v=3",
+        "my setTimeout 0"
+      ],
+      "T5_functions_run_on_cart_click": [
+        "CartIcon"
+      ],
+      "T6a_urgent_update": [
+        "t=b deferred=a",
+        "t=b deferred=b"
+      ],
+      "T6b_update_inside_transition": [
+        "t=c deferred=c"
+      ],
+      "T6c_initialValue_on_mount": [
+        "mount/update: t=a deferred=INITIAL",
+        "mount/update: t=a deferred=a"
+      ],
+      "T7_memo_noProps_child": [
+        "Search"
+      ]
+    },
+    "interrupt-order.production": {
+      "default_update_mid_transition": [
+        "-- fire at rowRenders=242",
+        "commit q=default_update_mid_transition u=0 (rowRenders so far=1500)",
+        "commit q=default_update_mid_transition u=1 (rowRenders so far=3000)"
+      ],
+      "click_mid_transition": [
+        "-- fire at rowRenders=292",
+        "commit q=x u=2 (rowRenders so far=292)",
+        "commit q=click_mid_transition u=2 (rowRenders so far=1792)"
+      ]
+    },
+    "perf-tracks.development": {
+      "Scheduler ⚛ / Blocking": 10,
+      "Scheduler ⚛ / Transition": 6,
+      "Scheduler ⚛ / Suspense": 3,
+      "Scheduler ⚛ / Idle": 3,
+      "- / Components ⚛": 3
+    },
+    "perf-tracks.production": {}
+  }
+}
