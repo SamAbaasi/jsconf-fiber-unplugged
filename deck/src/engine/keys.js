@@ -36,6 +36,9 @@ export function keyToAction(e) {
     case 'p':
     case 'P':
       return 'presenter';
+    case 'm':
+    case 'M':
+      return 'sound';
     default:
       return null;
   }

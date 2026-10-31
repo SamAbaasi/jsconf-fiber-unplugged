@@ -28,6 +28,8 @@
 .p-drift.ahead { color: var(--rank-b); }
 .p-link.ok { color: var(--rank-d); }
 .p-link.bad { color: var(--rank-a); }
+.p-sound { color: var(--muted); }
+.p-sound.ok { color: var(--rank-s); }
 
 .p-main {
   display: grid;

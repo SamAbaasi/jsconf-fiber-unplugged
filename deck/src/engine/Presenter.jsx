@@ -42,6 +42,7 @@ function useClock() {
 export function Presenter() {
   const [pos, setPos] = useState(() => fromHash(slides));
   const [connected, setConnected] = useState(false);
+  const [sound, setSound] = useState(false);
   const [timer, setTimer] = useState({ running: false, startedAt: 0, banked: 0 });
   const now = useClock();
 
@@ -51,6 +52,7 @@ export function Presenter() {
       if (msg.type === 'state') {
         setConnected(true);
         setPos({ slide: msg.slide, step: msg.step });
+        setSound(Boolean(msg.sound));
       }
     });
     send({ type: 'hello' });
@@ -73,6 +75,7 @@ export function Presenter() {
       }
       const action = keyToAction(e);
       if (!action || action === 'presenter' || action === 'fullscreen' || action === 'blur') return;
+      // 'sound' is forwarded: the audio plays in the audience window.
       e.preventDefault();
       send({ type: 'nav', action });
     };
@@ -110,6 +113,7 @@ export function Presenter() {
         </div>
         <div className="p-clock">{new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
         <div className={`p-link ${connected ? 'ok' : 'bad'}`}>{connected ? '● linked' : '○ not linked'}</div>
+        <div className={`p-sound ${sound ? 'ok' : ''}`}>sound {sound ? 'ON' : 'off'} (M)</div>
       </header>
 
       <main className="p-main">
@@ -143,7 +147,7 @@ export function Presenter() {
         </section>
       </main>
       <footer className="p-help">
-        → / PageDown next · ← / PageUp back · B black screen · T timer start/pause · R reset timer
+        → / PageDown next · ← / PageUp back · B black screen · M sound · T timer start/pause · R reset timer
       </footer>
     </div>
   );

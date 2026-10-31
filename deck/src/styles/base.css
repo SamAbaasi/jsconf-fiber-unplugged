@@ -144,3 +144,17 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .fade-in, .pop-in { animation-duration: 1ms; }
 }
+
+.sound-badge {
+  position: absolute;
+  top: 18px;
+  right: 24px;
+  z-index: 50;
+  padding: 2px 14px;
+  font-size: 32px;
+  color: var(--rank-s);
+  background: rgba(5, 7, 26, 0.85);
+  border: 3px solid var(--rank-s);
+  border-radius: 8px;
+}
+.sound-badge.is-flash { font-size: 40px; }

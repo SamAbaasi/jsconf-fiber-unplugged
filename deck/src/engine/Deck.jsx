@@ -5,11 +5,16 @@ import { SlideView } from './SlideView.jsx';
 import { clamp, fromHash, next, prev, samePos, toHash } from './nav.js';
 import { keyToAction } from './keys.js';
 import { addPeer, listen, send } from './sync.js';
+import { interceptNext } from './interceptors.js';
+import { isSoundOn, onSoundChange, toggleSound } from '../audio/sfx.js';
+import { SoundBadge } from '../ui/SoundBadge.jsx';
 
 export function Deck() {
   const [pos, setPos] = useState(() => fromHash(slides));
   const [blank, setBlank] = useState(false);
   const [cursorHidden, setCursorHidden] = useState(false);
+  const [sound, setSound] = useState(isSoundOn);
+  useEffect(() => onSoundChange(setSound), []);
   const posRef = useRef(pos);
   posRef.current = pos;
 
@@ -17,7 +22,11 @@ export function Deck() {
     switch (action) {
       case 'next':
         setBlank(false);
+        if (interceptNext()) break;
         setPos((p) => next(slides, p));
+        break;
+      case 'sound':
+        toggleSound();
         break;
       case 'prev':
         setBlank(false);
@@ -68,8 +77,8 @@ export function Deck() {
   useEffect(() => {
     const hash = toHash(pos);
     if (location.hash !== hash) history.replaceState(null, '', hash);
-    send({ type: 'state', ...pos, blank });
-  }, [pos, blank]);
+    send({ type: 'state', ...pos, blank, sound });
+  }, [pos, blank, sound]);
 
   useEffect(() => {
     const onHash = () => {
@@ -84,7 +93,7 @@ export function Deck() {
     () =>
       listen((msg) => {
         if (msg.type === 'nav') act(msg.action, msg);
-        if (msg.type === 'hello') send({ type: 'state', ...posRef.current, blank: false });
+        if (msg.type === 'hello') send({ type: 'state', ...posRef.current, blank: false, sound: isSoundOn() });
       }),
     [act],
   );
@@ -110,6 +119,7 @@ export function Deck() {
     <div className={cursorHidden ? 'hide-cursor' : ''} style={{ height: '100%' }}>
       <Stage blank={blank}>
         <SlideView key={slide.id} slide={slide} step={pos.step} />
+        <SoundBadge on={sound} />
       </Stage>
     </div>
   );
