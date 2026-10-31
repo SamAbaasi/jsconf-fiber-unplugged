@@ -6,9 +6,9 @@
   "description": "Interactive slide deck for 'React Fiber Unplugged' (JSConf JP 2026). Runs fully offline.",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/check-scale.mjs && vite build",
     "preview": "vite preview --port 4173 --strictPort",
-    "check": "node scripts/check-claims.mjs && node scripts/check-offline.mjs",
+    "check": "node scripts/check-claims.mjs && node scripts/check-scale.mjs && node scripts/check-offline.mjs",
     "fonts": "node scripts/gen-fonts.mjs",
     "check:claims": "node scripts/check-claims.mjs"
   },

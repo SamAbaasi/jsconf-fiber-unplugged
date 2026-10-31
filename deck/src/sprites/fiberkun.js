@@ -14,9 +14,12 @@ export const PALETTE = {
   o: '#ff9f1c', // thread tip (a tiny node)
   p: '#ff9fb2', // cheeks
   f: '#3b2a6b', // feet
-  r: '#c23a50', // necktie (previous life)
-  c: '#8a5a2b', // briefcase
-  C: '#5c3a1a', // briefcase shade
+  v: '#4b3a7a', // eye bags (previous life)
+  m: '#9aa3c7', // laptop
+  M: '#6b7396', // laptop shade
+  c: '#c98a4b', // coffee sleeve
+  C: '#8a5a2b', // coffee sleeve shade
+  u: '#d8dcf0', // steam
 };
 
 const BODY = [
@@ -90,35 +93,38 @@ export const FIBER_KUN = { idle: [idle0, idle1], walk: [walk0, walk1], rest: [re
 
 export const FACES = { normal: idle0, shocked, smug, sleeping };
 
-// Previous life: the same character as a tired salaryman. No headband yet, tired eyes
-// with dark bags, a white collar and a necktie.
-function setRow(rows, y, from, chars) {
-  rows[y] = rows[y].slice(0, from) + chars + rows[y].slice(from + chars.length);
-}
-const office = BODY.slice();
-office[6] = '..kbbbbbbbbbbbk.';
-office[7] = '..kbbbbbbbbbbbk.';
-office[8] = '..kbkkkbbbkkkbk.';
-office[9] = '..kbwwkbbbwwkbk.';
-office[10] = '..kbddbbbbbddbk.';
-office[11] = '..kdbbbbbbbbbdk.'; // no mouth: so the tie below reads as a tie
-office[12] = '...kdbbrrrbbddk.';
-office[13] = '....kdddrddddk..';
-const OFFICE_FEET = ['....kfkrk.kfk...', '....kkkkk.kkk...'];
-export const SALARYMAN = [[...office, ...OFFICE_FEET], [...squash(office), ...OFFICE_FEET]];
-// A briefcase, held next to him.
-export const BRIEFCASE = [
-  '..kkkk..',
-  '..k..k..',
-  'kkkkkkkk',
-  'kccccccK',
-  'kcCyycck',
-  'kcccccck',
-  'kCCCCCCk',
-  'kkkkkkkk',
-].map((r) => r.replace(/K/g, 'k'));
+// Previous life: the same character as a tired frontend developer in Tehran. No headband
+// yet, heavy eyelids with dark bags, a flat mouth. He holds a laptop and a coffee cup
+// (separate props, drawn next to him). No necktie: at 16 px it read as a tongue.
+const dev = BODY.slice();
+dev[6] = '..kbbbbbbbbbbbk.';
+dev[7] = '..kbbbbbbbbbbbk.';
+dev[8] = '..kbkkkbbbkkkbk.'; // heavy eyelids
+dev[9] = '..kbwkkbbbwkkbk.'; // half-closed eyes
+dev[10] = '..kbvvbbbbbvvbk.'; // dark bags
+dev[11] = '..kdbbbbkkbbbdk.'; // flat, tired mouth
+export const DEV = [[...dev, ...FEET.stand], [...squash(dev), ...FEET.stand]];
 
-for (const [name, frames] of Object.entries({ ...FIBER_KUN, faces: Object.values(FACES), salaryman: SALARYMAN })) {
+// A closed laptop, held under the arm (seen from the side, a thin slab with a sticker).
+export const LAPTOP = [
+  'kkkkkkkkkk',
+  'kmmmmmmmmk',
+  'kmmmmmmymk',
+  'kMMMMMMMMk',
+  'kkkkkkkkkk',
+];
+// A paper coffee cup with a sleeve and steam.
+export const COFFEE = [
+  '..u.u.',
+  '.u.u..',
+  'kkkkkk',
+  'kwwwwk',
+  'kccCck',
+  'kccCck',
+  '.kwwk.',
+  '.kkkk.',
+];
+for (const [name, frames] of Object.entries({ ...FIBER_KUN, faces: Object.values(FACES), dev: DEV })) {
   for (const f of frames) {
     if (f.length !== 16 || f.some((r) => r.length !== 16)) throw new Error(`Fiber-kun frame "${name}" is not 16×16`);
   }
