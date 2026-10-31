@@ -211,3 +211,25 @@ export function fallenArt(t) {
   }
   return { cols: ART.cols, rows: ART.rows, px: ART_PX, shape: out };
 }
+
+// The kneeling pose (QUEST FAILED): the list did render, so the dragon is beaten, but the user
+// already left. It does not lie down: it kneels, legs folded under it, head bowed, eyes open.
+export function kneelingArt(t) {
+  const out = new Array(ART.cols * ART.rows).fill(0);
+  const drop = (ax) => Math.round(t * (3 + (ax < 26 ? (26 - ax) * 0.4 : 0)));
+  for (let ay = 0; ay < ART.rows; ay++) {
+    for (let ax = 0; ax < ART.cols; ax++) {
+      const v = ART_SHAPE[ay * ART.cols + ax];
+      if (!v) continue;
+      const leg = ay >= BODY_BOTTOM && ax >= LEG_COLS[0] && ax <= LEG_COLS[1];
+      if (leg) {
+        // folded legs: only the feet stay, on the ground
+        if (ay >= ART.rows - 2 || t < 0.3) out[ay * ART.cols + ax] = v;
+        continue;
+      }
+      const ny = Math.min(ART.rows - 3, ay + drop(ax));
+      out[ny * ART.cols + ax] = v;
+    }
+  }
+  return { cols: ART.cols, rows: ART.rows, px: ART_PX, shape: out };
+}

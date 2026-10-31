@@ -167,8 +167,8 @@ Goal (R1 = C and R2 = S in ≥ 4/5 for a, b, c-2×) is met at 12 µs, so no tuni
 **Built:**
 - **Boss room you can read without text or sound.**
   - Your UI is a small castle with six lit windows. Each real bite turns one window off; more than 5 bites and the towers burn.
-  - QUEST FAILED: red smoky sky, burning castle, goblins on the battlements, the dragon sunk on its belly (it did render), "TOO LATE" instead of "FINISH!", Fiber-kun kneeling with gloom lines and a broken sword, grey arena.
-  - PERFECT: all windows lit, fireworks, raised sword.
+  - QUEST FAILED: red smoky sky, burning castle, goblins on the battlements, the dragon only kneels with its head bowed (the list did render, but there is no victory picture; Saman chose this), "TOO LATE" instead of "FINISH!", Fiber-kun kneeling with gloom lines and a broken sword, grey arena.
+  - PERFECT: the dragon lies flat with its head on the grass and eyes closed, all windows lit, fireworks, raised sword.
   - Fight view: the code is one line in the header; the right side shows only two big numbers (FPS, worst key; worst key never goes down).
   - A REPLAY step after each round shows the round's real timeline. Rounds type for 4.48 s (C11).
   - Goblin and dragon are on Fiber-kun's ×12 grid; the dragon keeps 10,000 seamless 6 px cells.

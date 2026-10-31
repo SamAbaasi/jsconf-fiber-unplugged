@@ -19,7 +19,7 @@ import { FIBER_KUN, FACES, PALETTE } from '../sprites/fiberkun.js';
 import { GOBLIN, GOBLIN_PALETTE } from '../sprites/goblin.js';
 import { drawSword } from '../sprites/sword.js';
 import { spriteCanvas } from '../ui/Sprite.jsx';
-import { makeDragon, fallenArt, DESIGN, DESIGN_PX, DRAGON_PX, DRAGON_POINTS, DEFAULT_CELLS } from './dragon.js';
+import { makeDragon, fallenArt, kneelingArt, DESIGN, DESIGN_PX, DRAGON_PX, DRAGON_POINTS, DEFAULT_CELLS } from './dragon.js';
 import { SCALES, bbox, reportBox } from '../sprites/scale.js';
 import { analyzePhases } from './phases.js';
 import { eventLog } from '../instrument/eventLog.js';
@@ -134,10 +134,10 @@ const FORM_COLORS = {
 const FALL_MS = 700;
 const FALL_STEPS = 8;
 const fallCache = new Map();
-function fallenCanvas(cls, k) {
-  const key = `${cls}:${k}`;
+function fallenCanvas(cls, k, kneel) {
+  const key = `${cls}:${k}:${kneel ? 'kneel' : 'fall'}`;
   if (fallCache.has(key)) return fallCache.get(key);
-  const art = fallenArt(k / FALL_STEPS);
+  const art = (kneel ? kneelingArt : fallenArt)(k / FALL_STEPS);
   const colors = FORM_COLORS[cls] || BASE_COLORS;
   const c = document.createElement('canvas');
   c.width = art.cols * art.px;
@@ -267,6 +267,8 @@ export function createGame(els) {
     // The dragon falls whenever the list really showed the last keystroke (it did render).
     if (outcome === 'WIN') {
       g.fallAt = now;
+      // The village already fell: the dragon is beaten but only kneels (no victory picture).
+      g.fallPose = g.bites > RULES.questFailBites ? 'kneel' : 'fall';
       if (els.hydra) els.hydra.classList.add('is-collapsed'); // the canvas draws the fallen pose
     }
   }
@@ -589,7 +591,7 @@ export function createGame(els) {
       if (g.fallAt) {
         const k = Math.min(FALL_STEPS, Math.floor(((now - g.fallAt) / FALL_MS) * FALL_STEPS));
         if (r && r.questFailed) ctx.filter = 'grayscale(0.9) brightness(0.8)';
-        ctx.drawImage(fallenCanvas(g.form.cls, k), DRAGON_BOX.x, DRAGON_BOX.y);
+        ctx.drawImage(fallenCanvas(g.form.cls, k, g.fallPose === 'kneel'), DRAGON_BOX.x, DRAGON_BOX.y);
         ctx.filter = 'none';
       }
       // Hit flash: the dragon's silhouette in white, at the contact frame.
