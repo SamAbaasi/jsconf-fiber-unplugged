@@ -120,7 +120,7 @@ All source links point at the tag: `https://github.com/facebook/react/blob/v19.3
 | # | Claim | Status | Evidence |
 |---|---|---|---|
 | J1 | React Performance Tracks exist in 19.3.1: a **"Scheduler ⚛"** group with **Blocking / Transition / Suspense / Idle** tracks, and a **"Components ⚛"** track, in the Chrome DevTools **Performance** panel. They are written with `console.timeStamp` and are on when `enableProfilerTimer` (= `__PROFILE__`), so you get them in **development** and **profiling** builds, **not in production**. No setting to turn on: you record a profile in the Performance panel. For a prod-like profile, alias `react-dom/client` to `react-dom/profiling`. (The Gesture track is experimental only.) | ✅ S B E ⚠️ | [ReactFiberPerformanceTrack.js#L42-L110](https://github.com/facebook/react/blob/v19.3.1/packages/react-reconciler/src/ReactFiberPerformanceTrack.js#L42-L110); [ReactFeatureFlags.js#L242](https://github.com/facebook/react/blob/v19.3.1/packages/shared/ReactFeatureFlags.js#L242), [#L248](https://github.com/facebook/react/blob/v19.3.1/packages/shared/ReactFeatureFlags.js#L248). **B:** 0 `console.timeStamp` calls in `react-dom-client.production.js`, 32 in `react-dom-profiling.profiling.js`. **E:** the dev build logged entries on all 4 Scheduler tracks and on Components; the prod build logged nothing. ⚠️ I have not seen them *visually* in a headed Chrome yet; check on the stage laptop. |
-| J2 | Live scheduler instrumentation is **feasible**. `react-dom` does `require("scheduler")` and reads `unstable_scheduleCallback` / `unstable_shouldYield` from it, so aliasing `scheduler` to a wrapper records real task start, yield and end events. | ✅ E | `verification/sched-wrapper.js`; used for every **E** row above. To confirm with Vite in Phase 2 (dev pre-bundling + Rollup prod build). |
+| J2 | Live scheduler instrumentation **works in the deck**. `react-dom` does `require("scheduler")` and reads `unstable_scheduleCallback` / `unstable_shouldYield` from it, so aliasing `scheduler` to a wrapper records real task start, yield and end events. The deck's live timeline is drawn from these events, **not from a simulation**. | ✅ E | `verification/sched-wrapper.js` (used for every **E** row above); `deck/src/instrument/scheduler-wrapper.js` + `deck/vite.config.js`. Confirmed in **Vite 8.3.5 dev** (dependency pre-bundling) and in **`vite build`** (react-dom's `require` resolves to the wrapper). The wrapper only records: `shouldYield`, the 5 ms slice and the priorities are the real ones. |
 
 ---
 
@@ -144,5 +144,5 @@ Fixed only in the articles and in Q&A (no stage time): Part 2 "different part of
 ## Still open (before slides are final)
 
 1. See the Performance Tracks visually in headed Chrome on the stage laptop (J1).
-2. Confirm the `scheduler` alias works in Vite dev and in `vite build` (J2). Phase 2.
+2. ~~Confirm the `scheduler` alias works in Vite dev and in `vite build` (J2).~~ Done in Phase 2.
 3. Measure slice lengths and FPS on the stage laptop, not only in headless Chromium.

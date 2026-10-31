@@ -23,3 +23,27 @@
 - The earlier `source-material/CLAIMS.draft.md` was mostly right. It missed the "Default does not interrupt a transition" rule and the per-browser-task 5 ms detail, and its note on Part 2 was slightly off (Part 2 does mention abort).
 
 **Next:** waiting for approval of CLAIMS.md + OUTLINE.md before Phase 2.
+
+## Phase 2: prototype scene (2026-10-31)
+
+**Built** (`deck/`, Vite 8.3.5 + React 19.3.1, one offline HTML file):
+- Deck engine: 1920×1080 stage scaled to any screen; arrows / PageUp / PageDown / Space; one click = one step; URL keeps the position; B = black screen.
+- Presenter window (P): current slide, next step, notes with the current step highlighted, timer with plan/ahead/behind. Synced by postMessage (works from `file://`) plus BroadcastChannel.
+- Slide 1, **Title**: 「転生したらReactのFiberだった件」 cover; Fiber-kun says こんにちは on click.
+- Slide 2, **STATUS window**: real FiberNode fields for `CartIcon`, revealed group by group, with the child / sibling / return diagram and the alternate twin.
+- Slide 3, **Skill unlocked: Yield**: popup → old vs new loop → animated tree walk in 5 ms slices → browser turn → resume from the same fiber → commit. The walk order is computed by simulating React's begin/complete rules, not typed by hand.
+- Slide 4, **Boss fight (live)**: a real React app inside the slide, 10,000 cell components × ~12 µs (calibrated). Click 1/2/3 = sync / useTransition / useDeferredValue. A live FPS meter, the game world on canvas, and a **live timeline from the real `scheduler` package** (aliased wrapper) with a 120 ms zoom lane showing each 5 ms slice.
+- Fiber-kun: an original 16×16 sprite drawn as code (idle, walk, rest). Fonts are bundled (OFL). No network: a CSP blocks it and `npm run check` verifies it.
+
+**Measured** (headless Chromium in the cloud container, production build, 13 auto-typed keystrokes):
+
+| Mode | FPS while typing | Worst frame | Renders thrown away |
+|---|---|---|---|
+| Sync | 20–49 | 134–188 ms | 0 (each key = one ~124 ms sync render, no Scheduler task) |
+| useTransition | 60 | 32–34 ms | 9 |
+| useDeferredValue | 61 | 27–36 ms | 17–18 |
+
+**Known limits / not done yet**
+- The ~30 ms worst frame in transition modes is likely the commit (commits never yield) repainting thousands of cells, in a container with no GPU. It needs measuring on the stage laptop. If it is too high there, I can reduce the DOM cost (for example, draw the grid on a canvas from a layout effect).
+- The headless numbers are not stage numbers. `[` / `]` adjust the work per cell on stage.
+- Not built yet (Phase 3): the other ~38 slides, SCRIPT.md, the PDF and MP4 fallback, RUNBOOK.md.
