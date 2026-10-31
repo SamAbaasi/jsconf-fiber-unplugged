@@ -50,10 +50,11 @@ If the panel says **"No setting works on this machine"**, it shows the reason:
 ### By hand
 
 - **[** / **]**: less / more work per cell (2 µs steps). The value is in the top bar.
-- **A**: auto-type one round. **R**: restart the round. **↑**: jump (shows the input delay when it's over 50 ms).
+- **A**: auto-type one round (12 keys). **R**: restart the round (with a warm-up render). **↑**: jump (shows the input delay when it's over 50 ms).
+- **Typing by hand:** a round is **12 keys** ("keys 3 / 12" in the arena). A pause never ends a round. **Enter** (or the **clicker**) ends it early after at least 3 keys; with fewer it says "type more".
 
 ### What the numbers mean
 
 - A **goblin** is one keystroke. Its latency is measured from the input event's `timeStamp` to the first animation frame after the commit that shows its text. Over 50 ms, it bites.
 - The **dragon** is the list: one fiber (and one DOM node) per cell. Its HP is the number of keystrokes of this round the list hasn't rendered yet. Each real list commit is a hit; the final commit (the one that shows the last keystroke) kills it.
-- Rank: **S** 0 bites and no frame over 100 ms · **A** ≤ 2 bites and no frame over 150 ms · **B** ≤ 5 bites · **C** more than 5 bites = **QUEST FAILED** ("DRAGON DOWN… but the village fell": the list did render, but the user waited too long). Only bites and frames decide it; there is no HP luck.
+- The castle (your UI) falls when, after 3 keys, at least **50%** of the keys bite → **QUEST FAILED**. Ranks: **S** 0 bites · **A** at most 10% bite and worst key ≤ 100 ms · **B** fewer than 50% bite · **C** = QUEST FAILED. The dragon's HP is the round's key count; it goes down when the list shows the last key (in a lost round it only kneels).
