@@ -98,8 +98,9 @@ Genre words that are **not** extra metaphors (they are framing): LEVEL UP, skill
 | 3 | The bar is empty → he stops; the browser paints; a MessageChannel message starts the next task. | Yield = give the browser a turn. | C5, C6, C7 | DRAFT: "The browser's turn. It paints. I wait." |
 | 4 | Next slice starts at the **same** fiber. | Yield resumes; nothing is lost. | B1 | DRAFT: "New task. Same fiber. Nothing lost." |
 | 5 | Last slice, then commit (commit never stops). | Commit is not sliced. | G1 | DRAFT: "Done. Now commit. Commit never stops." |
-| 6 | **Why "dud"?** Two layers: lanes decide *what*, the Scheduler decides *when*. A click is SyncLane: it runs in a microtask and never enters the Scheduler queue, so it never gets 《Yield》. | Yield only works for work React may pause. | C1, C2, A4 | DRAFT: "So why is it a dud skill? A click never meets the Scheduler. It runs in a microtask, with no yield." |
-| 7 | **LEVEL UP! Lv2 → Lv3.** New skill: **Guild card** (lanes). IDs in small text. | Next floor: who decides what is urgent? | D1 | DRAFT: "To use my skill, I need to know which quests are urgent." |
+| 6 | Summary: "YIELD = PAUSE. Same fiber. Same tree. Nothing lost. But only for work React may pause." | Yield = pause. | B1, A4 | DRAFT: "Yield = pause. Same fiber, same tree. But only for work React may pause." |
+| 7 | **Why "dud"?** Two layers: lanes decide *what*, the Scheduler decides *when*. A click is SyncLane: it runs in a microtask and never enters the Scheduler queue, so it never gets 《Yield》. | Yield only works for work React may pause. | C1, C2, A4 | DRAFT: "So why is it a dud skill? A click never meets the Scheduler. It runs in a microtask, with no yield." |
+| 8 | **LEVEL UP! Lv2 → Lv3.** New skill: **Guild card** (lanes). IDs in small text. | Next floor: who decides what is urgent? | D1 | DRAFT: "To use my skill, I need to know which quests are urgent." |
 
 ### 9:30 · Floor 3 · Lv3 Guild quest board = lanes (3:00) · Placeholder
 

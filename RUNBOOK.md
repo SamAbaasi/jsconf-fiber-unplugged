@@ -1,6 +1,6 @@
 # RUNBOOK
 
-*Phase 2.7: this file has the calibration section and the basics. The full pre-talk checklist and the fallback switch come in Phase 3.*
+*Phase 3a: this file has the calibration section and the basics. The full pre-talk checklist and the fallback switch come in Phase 3.*
 
 ## Run the deck
 
@@ -14,7 +14,9 @@ Open `deck/dist/index.html` in Chrome (double-click works, no server needed). **
 
 ## Calibration (do this on the presentation laptop, before the talk)
 
-The boss fight compares three rounds with **the same work per cell**. How much work is right depends on the laptop and the screen, so measure it on the real setup once.
+The boss room compares three rounds with **the same work**: N cells (fibers) × X µs of work per cell, the same for all three rounds and always shown in the top bar. What is right depends on the laptop and the screen, so measure it on the real setup once.
+
+Why two numbers? On a slow machine the long frames in round 2 are not the render (that is sliced into 5 ms pieces): they are the **commit and the browser's style/layout/paint of the DOM** (each cell is one DOM node), which never yield. Fewer cells = a smaller DOM. The result screen shows the measured split of the worst frame: *render · commit · style/layout/paint · canvas · other*.
 
 ### Before you start
 
@@ -26,19 +28,22 @@ The boss fight compares three rounds with **the same work per cell**. How much w
 
 ### Steps
 
-1. Go to the boss-fight slide: press **End** and then **←** until "BOSS FIGHT", or type `#/6/0` at the end of the URL.
+1. Go to the boss room: type `#/9/0` at the end of the URL (or page through until "BOSS ROOM").
 2. Press **K**. A checklist appears on the right. Check every line.
 3. Press **K** again. Calibration starts. **Don't touch the keyboard or mouse.**
-   - It plays rounds 1, 2, 3 five times (auto-type), about 2–3 minutes per work value.
-   - If round 2 is not rank **S** in at least 4 of 5 runs, it lowers the work per cell by 2 µs (the same as the **[** key) and runs again.
-   - It stops at the **highest** work value where round 2 is S in ≥ 4/5 **and** round 1 is still C in ≥ 4/5.
-   - The same value is used for all three rounds, so the comparison stays fair.
-4. When it's done, the chosen value is shown big, for example **8 µs**, with a table of every run.
-5. Reuse it: open the deck as `index.html?work=8#/1/0` (put your value after `work=`). Bookmark that URL. The top bar of the boss slide shows "same work: 10,000 fibers × 8 µs".
+   - It plays rounds 1, 2, 3 five times (auto-type), about 2–3 minutes per setting.
+   - It starts at 10,000 cells × 12 µs (or your `?work`/`?cells` values).
+   - If round 2 is not rank **S** in at least 4 of 5 runs, it looks at round 2's measured worst frames:
+     - mostly **commit + style/layout/paint** → the next smaller DOM: 10,000 → 6,400 → 3,600 → 1,600 cells, with more µs per cell so that cells × µs stays about the same;
+     - mostly **render** → the next smaller DOM at the same µs (less render work too); at 1,600 cells, 2 µs less per cell (the same as the **[** key).
+   - It stops at the first setting where round 2 is S in ≥ 4/5 **and** round 1 is still C in ≥ 4/5.
+   - One setting for all three rounds, so the comparison stays fair.
+4. When it's done, the chosen setting is shown big, for example **3,600 × 33 µs**, with a table of every run and the measured split of round 2's worst frame.
+5. Reuse it: open the deck as `index.html?work=33&cells=3600#/1/0` (your values). Bookmark that URL. The top bar of the boss slide shows "same work: 3,600 fibers × 33 µs".
 
-If the panel says **"No value works on this machine"**, it shows the reason:
+If the panel says **"No setting works on this machine"**, it shows the reason:
 - *"round 2 is already S, but round 1 is C in only N/5"*: this machine is so fast that round 1 doesn't jank clearly even at the starting value. Try once more with more work: press **]** a few times (it shows the value in the top bar), then **K**, **K** again.
-- *"even at 2 µs round 2 is S in only N/5"*: the machine (or its screen setup) is too slow for a clean round 2. Check the list above (power, battery saver, other apps), then try again. If it still fails, use the recorded fallback video for that part.
+- *"even with 1,600 cells × N µs, round 2 is S in only N/5"*: the machine (or its screen setup) is too slow for a clean round 2. Check the list above (power, battery saver, other apps), then try again. If it still fails, use the recorded fallback video for that part.
 
 **K** or **Esc** cancels a running calibration. **Esc** closes the panel when it's done.
 
@@ -50,5 +55,5 @@ If the panel says **"No value works on this machine"**, it shows the reason:
 ### What the numbers mean
 
 - A **goblin** is one keystroke. Its latency is measured from the input event's `timeStamp` to the first animation frame after the commit that shows its text. Over 50 ms, it bites.
-- The **dragon** is the 10,000-fiber list. Its HP is the number of keystrokes of this round the list hasn't rendered yet. Each real list commit is a hit; the final commit (the one that shows the last keystroke) kills it.
-- Rank: **S** 0 bites and no frame over 100 ms · **A** ≤ 2 bites and no frame over 150 ms · **B** ≤ 5 bites · **C** more bites, or K.O.
+- The **dragon** is the list: one fiber (and one DOM node) per cell. Its HP is the number of keystrokes of this round the list hasn't rendered yet. Each real list commit is a hit; the final commit (the one that shows the last keystroke) kills it.
+- Rank: **S** 0 bites and no frame over 100 ms · **A** ≤ 2 bites and no frame over 150 ms · **B** ≤ 5 bites · **C** more than 5 bites = **QUEST FAILED** ("DRAGON DOWN… but the village fell": the list did render, but the user waited too long). Only bites and frames decide it; there is no HP luck.

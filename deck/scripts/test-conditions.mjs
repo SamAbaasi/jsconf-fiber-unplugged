@@ -19,10 +19,11 @@ const args = process.argv.slice(2);
 const arg = (name, def) => (args.includes(name) ? args[args.indexOf(name) + 1] : def);
 const runs = Number(arg('--runs', 5));
 const work = arg('--work', null);
+const cells = arg('--cells', null);
 const only = arg('--only', 'a,b,c2,c4,d1,d2').split(',');
 const outDir = path.resolve(arg('--out', path.join(root, '.check')));
 mkdirSync(outDir, { recursive: true });
-const url = `${pathToFileURL(path.join(root, 'dist', 'index.html')).href}${work ? `?work=${work}` : ''}#/6/0`;
+const url = `${pathToFileURL(path.join(root, 'dist', 'index.html')).href}${work || cells ? `?${[work && `work=${work}`, cells && `cells=${cells}`].filter(Boolean).join('&')}` : ''}#/9/0`;
 
 const CONDITIONS = {
   a: { label: 'a · normal headless 1920×1080' },
@@ -34,7 +35,7 @@ const CONDITIONS = {
 };
 
 const browser = await chromium.launch();
-const report = { url, work: work ?? 'default', runs, conditions: {} };
+const report = { url, work: work ?? 'default', cells: cells ?? 'default', runs, conditions: {} };
 
 for (const key of only) {
   const cond = CONDITIONS[key];
@@ -68,9 +69,10 @@ for (const key of only) {
       await page.keyboard.press('a');
       await page.locator('.boss-overlay.is-result').waitFor({ timeout: 60000 });
       const r = JSON.parse(await page.locator('.boss-overlay').getAttribute('data-result'));
-      const row = { run, round: round + 1, outcome: r.outcome, rank: r.rank, worstFrameMs: r.worstFrameMs, bites: r.bites, goblins: r.goblins, worstKeyMs: r.worstLatencyMs, medianKeyMs: r.medianLatencyMs, thrownAway: r.thrownAway, commits: r.commits, durationMs: r.durationMs };
+      const row = { run, round: round + 1, outcome: r.outcome, rank: r.rank, worstFrameMs: r.worstFrameMs, bites: r.bites, goblins: r.goblins, worstKeyMs: r.worstLatencyMs, medianKeyMs: r.medianLatencyMs, thrownAway: r.thrownAway, commits: r.commits, durationMs: r.durationMs, cells: r.cells, questFailed: r.questFailed, dragonDown: r.dragonDown, phasesWorst: r.phases?.worst || null, phasesTotals: r.phases?.totals || null };
       rows.push(row);
-      console.error(`${key} run ${run} round ${row.round}: ${row.outcome} ${row.rank} worst ${row.worstFrameMs} ms bites ${row.bites}/${row.goblins} key med ${row.medianKeyMs} max ${row.worstKeyMs}`);
+      const pw = row.phasesWorst;
+      console.error(`${key} run ${run} round ${row.round}: ${row.outcome} ${row.rank} worst ${row.worstFrameMs} ms bites ${row.bites}/${row.goblins} key med ${row.medianKeyMs} max ${row.worstKeyMs}${pw ? ` | worst LoAF ${pw.duration} = render ${pw.render} commit ${pw.commit} slp ${pw.styleLayoutPaint} canvas ${pw.canvas} other ${pw.other}` : ''}`);
       await page.waitForTimeout(1500);
     }
   }
@@ -84,6 +86,6 @@ for (const key of only) {
 }
 await browser.close();
 
-const name = `conditions-work-${work ?? 'default'}.json`;
+const name = `conditions-${cells ?? '10000'}x${work ?? 'default'}.json`;
 writeFileSync(path.join(outDir, name), JSON.stringify(report, null, 2));
 console.log(`wrote ${path.join(outDir, name)}`);

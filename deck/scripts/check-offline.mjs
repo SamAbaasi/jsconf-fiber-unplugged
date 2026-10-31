@@ -25,6 +25,7 @@ const url = pathToFileURL(path.join(root, 'dist', 'index.html')).href;
 const MIN_PX = 28;
 
 const problems = [];
+const BOSS = 9; // 1-based slide number of the boss room
 const blocked = [];
 
 const browser = await chromium.launch({ headless: !args.includes('--headed') });
@@ -84,6 +85,21 @@ function auditText(page) {
   }, MIN_PX);
 }
 
+async function measureScale(page) {
+  return page.evaluate(() => {
+        const boxes = JSON.parse(JSON.stringify(globalThis.__sceneBoxes || {}));
+        const arena = document.querySelector('.boss-arena');
+        const grid = document.querySelector('.dragon-grid');
+        // Arena H = the arena box (760 px on the 1920×1080 stage); the stage may be scaled.
+        const k = arena ? arena.getBoundingClientRect().width / 1150 : 1;
+        return {
+          boxes,
+          arenaH: arena ? arena.getBoundingClientRect().height / k : null,
+          dragonH: grid ? grid.getBoundingClientRect().height / k : null,
+        };
+      });
+}
+
 async function waitForState(page) {
   if (await page.locator('.yw').count()) return page.waitForTimeout(9500); // Yield walk animation
   if (await page.locator('.truck-slide').count()) {
@@ -127,7 +143,7 @@ const report = { url, states: [], fontAudit: [], wordsOver40: [], dialogueClick:
   await page.evaluate(() => document.fonts.ready);
 
   // Dialogue: a click while typing finishes the line and stays on the same step.
-  await page.keyboard.press('PageDown'); // cold open, step 1: the line starts typing
+  // (Cold open, step 0: the Tehran line starts typing on load.)
   await page.waitForTimeout(120);
   const before = await page.locator('.dlg-ghost').textContent();
   await page.keyboard.press('PageDown');
@@ -137,7 +153,7 @@ const report = { url, states: [], fontAudit: [], wordsOver40: [], dialogueClick:
     hashAfterClick: await hashOf(page),
     ghostAfterClick: (await page.locator('.dlg-ghost').textContent()).length,
   };
-  report.dialogueClick.ok = report.dialogueClick.hashAfterClick === '#/1/1' && report.dialogueClick.ghostBeforeClick > 0 && report.dialogueClick.ghostAfterClick === 0;
+  report.dialogueClick.ok = report.dialogueClick.hashAfterClick === '#/1/0' && report.dialogueClick.ghostBeforeClick > 0 && report.dialogueClick.ghostAfterClick === 0;
   if (!report.dialogueClick.ok) problems.push(`dialogue click test failed: ${JSON.stringify(report.dialogueClick)}`);
   await page.keyboard.press('Home');
   await page.waitForTimeout(300);
@@ -155,13 +171,27 @@ const report = { url, states: [], fontAudit: [], wordsOver40: [], dialogueClick:
     const audit = await auditText(page);
     report.states.push(h);
     if (audit.small.length) report.fontAudit.push({ state: h, boss: isBoss, small: audit.small });
-    if (!isBoss && audit.words > 40) report.wordsOver40.push({ state: h, words: audit.words });
+    // Dense by design: the bestiary (a recap to photograph) and the storyboard placeholders.
+    const dense = (await page.locator('.bs-slide, .ph-slide').count()) > 0;
+    if (!isBoss && audit.words > 40) (dense ? (report.denseByDesign ||= []) : report.wordsOver40).push({ state: h, words: audit.words });
     if (await page.locator('.truck-frozen b').count()) report.truckFrozenMs = await page.locator('.truck-frozen b').innerText();
+    if (h === '#/1/1') await page.waitForTimeout(2500); // let the truck freeze and the number appear, then shoot again
+    if (h === '#/1/1') await page.screenshot({ path: path.join(outDir, `${name}-after.png`) });
+    if (h === '#/1/1' && (await page.locator('.truck-frozen b').count())) report.truckFrozenMs = await page.locator('.truck-frozen b').innerText();
+    // Scale bible, measured in the page: what the scenes really drew.
+    if (h === '#/1/0' || h === '#/1/3') await page.waitForTimeout(400);
+    if (h === '#/1/1' || h === '#/1/3' || isBoss) {
+      const m = await measureScale(page);
+      (report.scaleMeasured ||= {})[h] = m;
+    }
 
     if (isBoss) {
       const mode = (await page.locator('.boss-mode.is-on').innerText()).trim();
       const r = await playRound(page, mode, { shot: path.join(outDir, `${name}-fight.png`), jumpAt: step === '0' ? 1800 : null });
       report.rounds.push(r);
+      // After the fight: goblins were drawn. Keep the dragon size from before the fight
+      // (after a win it lies rotated on the ground, which changes its bounding box).
+      report.scaleMeasured[h] = { ...report.scaleMeasured[h], boxes: (await measureScale(page)).boxes };
       await page.screenshot({ path: path.join(outDir, `${name}-result.png`) });
       await page.keyboard.press('c');
       await page.waitForTimeout(600);
@@ -196,7 +226,7 @@ if (stabilityRuns > 0) {
   watch(page, 'stability');
   report.stability = [];
   for (let run = 1; run <= stabilityRuns; run++) {
-    await page.goto(`${url}#/6/0`);
+    await page.goto(`${url}#/${BOSS}/0`);
     await page.reload();
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(1500);
@@ -217,31 +247,33 @@ if (stabilityRuns > 0) {
 // ---------- optional: record the truck scene and the three boss rounds ----------
 if (args.includes('--record')) {
   {
+    // The whole cold open: Tehran → truck → Japan → "plain JS object?" → [SYSTEM] → title.
     const videoDir = path.join(outDir, 'video-truck');
     mkdirSync(videoDir, { recursive: true });
     const context = await newContext({ recordVideo: { dir: videoDir, size: { width: 1280, height: 720 } } });
     const page = await context.newPage();
-    watch(page, 'record-truck');
-    await page.goto(`${url}#/2/0`);
+    watch(page, 'record-cold-open');
+    await page.goto(`${url}#/1/0`);
     await page.evaluate(() => document.fonts.ready);
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(3500);
     await page.keyboard.press('PageDown');
     await page.locator('.truck-frozen').waitFor({ timeout: 10000 });
     report.recordedTruckFrozenMs = await page.locator('.truck-frozen b').innerText();
-    await page.waitForTimeout(3500);
-    await page.keyboard.press('PageDown');
-    await page.waitForTimeout(3500);
+    await page.waitForTimeout(4000);
+    for (const wait of [3500, 3500, 3500, 3000]) {
+      await page.keyboard.press('PageDown');
+      await page.waitForTimeout(wait);
+    }
     await context.close();
     const file = readdirSync(videoDir).find((f) => f.endsWith('.webm'));
-    if (file) renameSync(path.join(videoDir, file), path.join(outDir, 'truck.webm'));
+    if (file) renameSync(path.join(videoDir, file), path.join(outDir, 'cold-open.webm'));
   }
   const videoDir = path.join(outDir, 'video-tmp');
   mkdirSync(videoDir, { recursive: true });
   const context = await newContext({ recordVideo: { dir: videoDir, size: { width: 1280, height: 720 } } });
   const page = await context.newPage();
   watch(page, 'record');
-  const bossIndex = 6; // 1-based slide number of the boss fight
-  await page.goto(`${url}#/${bossIndex}/0`);
+  await page.goto(`${url}#/${BOSS}/0`);
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(1500);
   report.recordedRounds = [];
@@ -257,6 +289,28 @@ if (args.includes('--record')) {
   await context.close();
   const file = readdirSync(videoDir).find((f) => f.endsWith('.webm'));
   if (file) renameSync(path.join(videoDir, file), path.join(outDir, 'boss-rounds.webm'));
+}
+
+// Scale bible, measured in the page (what was really drawn).
+{
+  const rows = [];
+  const cold = report.scaleMeasured?.['#/1/1']?.boxes?.['cold-open'] || {};
+  const cold3 = report.scaleMeasured?.['#/1/3']?.boxes?.['cold-open'] || {};
+  const bossM = Object.entries(report.scaleMeasured || {}).find(([k]) => k.startsWith(`#/${BOSS}/`))?.[1];
+  const add = (name, v, min, max) => rows.push({ name, value: v == null ? null : Math.round(v * 1000) / 1000, min, max, ok: v != null && v >= min && v <= max });
+  const hero = cold3.reborn?.h;
+  const dev = cold.truck ? cold['previous-life']?.h : null;
+  add('previous-life Fiber-kun px', cold['previous-life']?.h, 128, 128);
+  add('reborn Fiber-kun px', hero, 128, 128);
+  add('truck height / Fiber-kun', cold.truck && dev ? cold.truck.h / dev : null, 2.2, 2.8);
+  add('truck length / Fiber-kun', cold.truck && dev ? cold.truck.w / dev : null, 4.5, 5.5);
+  add('torii height / Fiber-kun', cold3.torii && hero ? cold3.torii.h / hero : null, 3, 4);
+  const b = bossM?.boxes?.boss || {};
+  add('boss dragon / arena H', bossM?.dragonH && bossM?.arenaH ? bossM.dragonH / bossM.arenaH : null, 0.55, 0.65);
+  add('boss Fiber-kun / arena H', b.hero && bossM?.arenaH ? b.hero.h / bossM.arenaH : null, 0.22, 0.26);
+  add('boss goblin / arena H', b.goblin && bossM?.arenaH ? b.goblin.h / bossM.arenaH : null, 0.1, 0.13);
+  report.scaleInPage = rows;
+  for (const r of rows) if (!r.ok) problems.push(`scale bible (in page): ${r.name} = ${r.value}, allowed ${r.min}–${r.max}`);
 }
 
 report.blockedRequests = blocked;
