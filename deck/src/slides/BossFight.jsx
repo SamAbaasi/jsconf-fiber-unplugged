@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useTransition, useDeferredValue } from 'react';
-import { HydraList } from '../demo/HydraList.jsx';
+import { DragonList, TextProbe } from '../demo/DragonList.jsx';
 import { calibrate, settings, setMicrosPerCell } from '../demo/work.js';
 import { startMonitor } from '../demo/monitor.js';
 import { createGame, ARENA } from '../demo/game.js';
-import { CELL_COUNT, countHits } from '../demo/hydra.js';
+import { CELL_COUNT, countHits } from '../demo/dragon.js';
+import { runCalibration, showChecklist } from '../demo/calibration.js';
 import { record } from '../instrument/eventLog.js';
 import { isTyping } from '../engine/keys.js';
 import { LINES } from '../content/lines.js';
@@ -26,7 +27,7 @@ const MODES = [
     key: 'deferred',
     rank: 'D',
     title: 'useDeferredValue',
-    code: ['onChange(e) {', '  setText(e.target.value); // S', '}', 'q = useDeferredValue(text);', '<HydraList query={q} /> // D'],
+    code: ['onChange(e) {', '  setText(e.target.value); // S', '}', 'q = useDeferredValue(text);', '<DragonList query={q} /> // D'],
   },
 ];
 
@@ -41,6 +42,15 @@ const TYPING_SCRIPT = (() => {
   }
   return steps;
 })();
+const TYPING_KEYS = TYPING_SCRIPT.filter((v) => v !== null).length;
+
+// Work per cell: from ?work=N if given (set by the calibration), else the default.
+function initialWork() {
+  calibrate();
+  const fromUrl = Number(new URLSearchParams(location.search).get('work'));
+  if (fromUrl > 0) setMicrosPerCell(fromUrl);
+  return settings.microsPerCell;
+}
 
 function typeInto(input, value) {
   // Same path as a real keystroke: a native "input" event, which React treats
@@ -58,28 +68,29 @@ function resultLine(r, modeKey) {
 }
 
 export function BossFight({ step }) {
-  const mode = MODES[Math.min(step, MODES.length - 1)];
-  const [micros, setMicros] = useState(() => {
-    calibrate();
-    return settings.microsPerCell;
-  });
-  const [text, setText] = useState('');
-  const [query, setQuery] = useState('');
+  // Calibration can drive the three modes itself; otherwise the slide step decides.
+  const [modeOverride, setModeOverride] = useState(null);
+  const mode = MODES[modeOverride ?? Math.min(step, MODES.length - 1)];
+  const [micros, setMicros] = useState(initialWork);
+  const [text, setText] = useState({ v: '', seq: 0 });
+  const [query, setQuery] = useState({ v: '', seq: 0 });
   const [isPending, startTransition] = useTransition();
   // Only fed while in deferred mode; otherwise it holds null and never defers.
   const deferredText = useDeferredValue(mode.key === 'deferred' ? text : null);
 
-  const names = ['arena', 'world', 'fx', 'hydra', 'hydraName', 'timer', 'overlay', 'fkHpBar', 'fkHpText', 'hydraHpBar', 'hydraHpText', 'respawnText', 'timeline', 'fpsGraph', 'fps', 'worst'];
+  const names = ['arena', 'world', 'fx', 'hydra', 'dragonKb', 'hydraName', 'timer', 'overlay', 'calib', 'fkHpBar', 'fkHpText', 'hydraHpBar', 'hydraHpText', 'respawnText', 'timeline', 'fpsGraph', 'fps', 'worst'];
   const refs = Object.fromEntries(names.map((n) => [n, useRef(null)]));
   const inputRef = useRef(null);
   const typingTimer = useRef(0);
   const gameRef = useRef(null);
-  const modeRef = useRef(mode.key);
-  modeRef.current = mode.key;
+  const seqRef = useRef(0);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const calibRef = useRef(null);
 
   useEffect(() => {
     const els = Object.fromEntries(names.map((n) => [n, refs[n].current]));
-    els.resultLine = (r) => resultLine(r, modeRef.current);
+    els.resultLine = (r) => resultLine(r, modeRef.current.key);
     const game = createGame(els);
     gameRef.current = game;
     const stop = startMonitor(els, game);
@@ -87,25 +98,27 @@ export function BossFight({ step }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // New round on every step; coming back from deferred mode, sync the list query again.
+  // New round whenever the mode changes; coming back from deferred mode, sync the list query.
   useEffect(() => {
-    gameRef.current?.setRound(step, mode.title);
-    if (mode.key !== 'deferred') setQuery(inputRef.current?.value ?? '');
-  }, [step, mode.key, mode.title]);
+    gameRef.current?.setRound(MODES.indexOf(mode), mode.title);
+    if (mode.key !== 'deferred') setQuery(text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const clearing = useRef(false);
   const onChange = (e) => {
     const v = e.target.value;
-    // A keystroke starts a round; clearing the box with C does not.
-    if (!clearing.current) record('key', { v });
+    const next = { v, seq: ++seqRef.current };
+    // A keystroke = one goblin. Clearing the box with C is not a keystroke of the round.
+    if (!clearing.current) record('key', { v, seq: next.seq, ts: e.nativeEvent.timeStamp });
     if (mode.key === 'sync') {
-      setText(v);
-      setQuery(v);
+      setText(next);
+      setQuery(next);
     } else if (mode.key === 'transition') {
-      setText(v);
-      startTransition(() => setQuery(v));
+      setText(next);
+      startTransition(() => setQuery(next));
     } else {
-      setText(v);
+      setText(next);
     }
   };
 
@@ -117,10 +130,14 @@ export function BossFight({ step }) {
     stopTyping();
     const input = inputRef.current;
     let i = 0;
+    record('typing:start', { total: TYPING_KEYS });
     typingTimer.current = setInterval(() => {
       const v = TYPING_SCRIPT[i++];
       if (v !== null) typeInto(input, v);
-      if (i >= TYPING_SCRIPT.length) stopTyping();
+      if (i >= TYPING_SCRIPT.length) {
+        stopTyping();
+        record('typing:end', { seq: seqRef.current });
+      }
     }, TYPE_EVERY_MS);
   };
   const clear = () => {
@@ -136,7 +153,39 @@ export function BossFight({ step }) {
 
   // Keyboard shortcuts. Registered once; they call the latest handlers through a ref.
   const handlers = useRef(null);
-  handlers.current = { autoType, clear, changeWork };
+  handlers.current = {
+    autoType,
+    clear,
+    changeWork,
+    calibrationKey() {
+      const c = calibRef.current;
+      if (c?.running) return c.cancel();
+      if (!c?.armed) {
+        calibRef.current = { armed: true };
+        showChecklist(refs.calib.current, settings.microsPerCell);
+        return;
+      }
+      calibRef.current = runCalibration({
+        panel: refs.calib.current,
+        game: () => gameRef.current,
+        setMode: (i) => setModeOverride(i),
+        autoType: () => handlers.current.autoType(),
+        getWork: () => settings.microsPerCell,
+        setWork: (us) => {
+          setMicrosPerCell(us);
+          setMicros(settings.microsPerCell);
+        },
+        modes: MODES,
+        onDone: () => setModeOverride(null),
+      });
+    },
+    cancelCalibration() {
+      const c = calibRef.current;
+      if (c?.running) c.cancel();
+      if (refs.calib.current) refs.calib.current.className = 'boss-calib';
+      calibRef.current = null;
+    },
+  };
   useEffect(() => {
     const onKey = (e) => {
       if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -147,6 +196,8 @@ export function BossFight({ step }) {
       else if (e.key === ']') h.changeWork(2);
       else if (e.key === '[') h.changeWork(-2);
       else if (e.key === 'i' || e.key === 'I') inputRef.current?.focus();
+      else if (e.key === 'k' || e.key === 'K') h.calibrationKey();
+      else if (e.key === 'Escape') h.cancelCalibration();
     };
     // ↑ = jump. Handled on window in the capture phase, before the deck sees it, so it never
     // changes the slide and the input keeps its focus. Input delay = handling time − event time.
@@ -164,12 +215,12 @@ export function BossFight({ step }) {
       window.removeEventListener('keydown', onJump, { capture: true });
       window.removeEventListener('keydown', onKey);
       clearInterval(typingTimer.current);
+      calibRef.current?.cancel?.();
     };
   }, []);
 
   const listQuery = mode.key === 'deferred' ? (deferredText ?? query) : query;
-  const pending =
-    mode.key === 'transition' ? isPending : mode.key === 'deferred' ? deferredText !== null && deferredText !== text : false;
+  const pending = mode.key === 'transition' ? isPending : mode.key === 'deferred' ? deferredText !== null && deferredText !== text : false;
 
   return (
     <div className={`boss mode-${mode.key}`}>
@@ -190,8 +241,10 @@ export function BossFight({ step }) {
       <div className="boss-arena" ref={refs.arena}>
         <canvas ref={refs.world} className="boss-layer pixelated" width={ARENA.w} height={ARENA.h} />
         <div className="boss-hydra" ref={refs.hydra}>
-          <div className={pending ? 'is-pending' : ''}>
-            <HydraList query={listQuery} />
+          <div className="dragon-kb" ref={refs.dragonKb}>
+            <div className={pending ? 'is-pending' : ''}>
+              <DragonList query={listQuery.v} seq={listQuery.seq} />
+            </div>
           </div>
         </div>
         <div className="boss-timer" ref={refs.timer} />
@@ -207,7 +260,7 @@ export function BossFight({ step }) {
         </div>
         <div className="hud hud-boss">
           <div className="hud-name" ref={refs.hydraName}>
-            JANK HYDRA
+            JANK DRAGON
           </div>
           <div className="hud-bar">
             <div className="hud-fill is-boss" ref={refs.hydraHpBar} />
@@ -224,14 +277,15 @@ export function BossFight({ step }) {
           id="boss-search"
           ref={inputRef}
           className="boss-input-field"
-          value={text}
+          value={text.v}
           onChange={onChange}
           autoComplete="off"
           spellCheck={false}
           placeholder="type here…"
         />
+        <TextProbe seq={text.seq} />
         <div className="boss-hits">
-          hits <b>{countHits(listQuery)}</b>
+          hits <b>{countHits(listQuery.v)}</b>
         </div>
         <div className={`boss-pending ${pending ? 'is-on' : ''}`}>{pending ? 'pending…' : ''}</div>
       </div>
@@ -265,6 +319,8 @@ export function BossFight({ step }) {
 
       {/* READY and RESULT panels cover the instruments between rounds, so the arena stays visible. */}
       <div className="boss-overlay" ref={refs.overlay} />
+      {/* Calibration (K): written by demo/calibration.js, outside React. */}
+      <div className="boss-calib" ref={refs.calib} />
     </div>
   );
 }

@@ -92,6 +92,13 @@ export function play(name) {
       ['G4', 'C5', 'E5', 'G5', 'C6', 'E6'].forEach((n, i) => tone('square', NOTES[n], t + i * 0.07, 0.1, 0.45));
       tone('triangle', NOTES.E6, t + 0.42, 0.5, 0.55);
       break;
+    case 'horn':
+      // A two-tone truck horn: two detuned square waves.
+      tone('square', 311, t, 0.5, 0.45);
+      tone('square', 370, t, 0.5, 0.35);
+      tone('square', 311, t + 0.55, 0.35, 0.45);
+      tone('square', 370, t + 0.55, 0.35, 0.35);
+      break;
     case 'fanfare':
       ['C5', 'C5', 'C5', 'G4', 'C5', 'E5', 'G5'].forEach((n, i) => tone('square', NOTES[n], t + [0, 0.1, 0.2, 0.32, 0.48, 0.6, 0.72][i], 0.12, 0.5));
       tone('square', NOTES.C6, t + 0.86, 0.6, 0.55);

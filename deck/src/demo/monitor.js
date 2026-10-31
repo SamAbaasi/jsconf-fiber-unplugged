@@ -83,7 +83,7 @@ function ingest(state, now, game) {
           game?.onDiscard(e.t);
         }
         state.attempts.push({ start: e.t, end: null, q: e.q, sync: e.task === null, status: 'running' });
-        game?.onAttempt(e.t);
+        game?.onAttempt(e);
         break;
       }
       case 'render:commit': {
@@ -92,13 +92,22 @@ function ingest(state, now, game) {
           last.status = 'committed';
           last.end = e.t;
           state.committed++;
-          game?.onCommit(e.t, e.q);
+          game?.onCommit(e);
         }
         break;
       }
       case 'key':
         state.keys.push(e.t);
-        game?.onKey(e.t);
+        game?.onKey(e);
+        break;
+      case 'text:commit':
+        game?.onTextCommit(e);
+        break;
+      case 'typing:start':
+        game?.onTypingStart(e.total);
+        break;
+      case 'typing:end':
+        game?.onTypingEnd(e.seq);
         break;
       default:
         break;
