@@ -503,7 +503,10 @@ export function createGame(els) {
         // Dragon fire = a real long frame (≥ 50 ms, L1): the heavy render blocked the main thread.
         // Drawn right after the freeze, with the measured gap. Sliced rounds have no long frames,
         // so the dragon cannot breathe fire there. Visual only: bites decide the result.
-        if (dt >= RULES.jankMs) g.breath = { t0: now, ms: Math.round(dt) };
+        if (dt >= RULES.jankMs) {
+          g.breath = { t0: now, ms: Math.round(dt) };
+          g.fkHitAt = now; // he flinches (visual only)
+        }
       }
 
       // Goblins: resolve the ones whose text was committed before this frame.
@@ -849,7 +852,8 @@ export function createGame(els) {
     const a = g.action;
     const t = a ? now - a.t0 : Infinity;
     const facingLeft = a && a.kind === 'goblin' && t < 260;
-    const frame = g.fkY > 0 ? FIBER_KUN.walk[0] : result && result.rank === 'S' ? FACES.smug : FIBER_KUN.idle[Math.floor(now / 300) % 2];
+    const singed = now - g.fkHitAt < 300 && !result; // flinch while the dragon's fire hits him
+    const frame = g.fkY > 0 ? FIBER_KUN.walk[0] : singed ? FACES.shocked : result && result.rank === 'S' ? FACES.smug : FIBER_KUN.idle[Math.floor(now / 300) % 2];
     const img = spriteCanvas(frame, PALETTE, HERO.scale);
     const hb = bbox(FIBER_KUN.idle[0]);
     reportBox('boss', 'hero', { x: x + hb.x * HERO.scale, y: y + hb.y * HERO.scale, w: hb.w * HERO.scale, h: hb.h * HERO.scale });
@@ -920,17 +924,24 @@ export function createGame(els) {
     const age = (now - b.t0) / 600;
     const mx = DRAGON_BOX.x + 3 * DESIGN_PX; // the mouth
     const my = DRAGON_BOX.y + 24 * DESIGN_PX;
-    const len = 320; // full length at once: the freeze already happened
-    for (let d = 0; d < len; d += PX) {
-      const spread = 6 + d * 0.35;
-      const cx = mx - d;
-      const cy = my + d * 0.55;
+    // Aimed at Fiber-kun: from the mouth to his body (full length at once: the freeze already happened).
+    const tx = heroX(now) + HERO.size / 2;
+    const ty = ARENA.groundY - HERO.size * 0.45;
+    const dx = tx - mx;
+    const dy = ty - my;
+    const len = Math.hypot(dx, dy);
+    const ux = dx / len;
+    const uy = dy / len;
+    for (let d = 0; d < len + PX; d += PX / 2) {
+      const spread = 6 + d * 0.32;
       for (let k = -spread; k <= spread; k += PX) {
         const flick = Math.floor(now / 60 + d / PX + k / PX) % 4;
         if (flick === 3 && Math.abs(k) > spread * 0.6) continue;
-        ctx.globalAlpha = (1 - age * age) * (1 - d / 480);
+        ctx.globalAlpha = (1 - age * age) * (0.95 - (d / len) * 0.25);
         ctx.fillStyle = Math.abs(k) < spread * 0.35 ? '#fff3b0' : flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
-        ctx.fillRect(Math.round((cx - PX / 2) / PX) * PX, Math.round((cy + k) / PX) * PX, PX, PX);
+        const px = mx + ux * d - uy * k;
+        const py = my + uy * d + ux * k;
+        ctx.fillRect(Math.round((px - PX / 2) / PX) * PX, Math.round((py - PX / 2) / PX) * PX, PX, PX);
       }
     }
     ctx.globalAlpha = 1 - age;
