@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useTransition, useDeferredValue } from 'react';
+import { flushSync } from 'react-dom';
+import { setNextInterceptor } from '../engine/interceptors.js';
 import { DragonList, TextProbe } from '../demo/DragonList.jsx';
 import { calibrate, settings, setMicrosPerCell } from '../demo/work.js';
 import { startMonitor } from '../demo/monitor.js';
@@ -20,14 +22,14 @@ const MODES = [
   { key: 'deferred', title: 'useDeferredValue', code: ['setText(v); q = useDeferredValue(text);', ''] },
 ];
 
-// Auto-type: four words, one letter every 140 ms, two holds, then clear: 32 steps = 4.48 s.
-// Kept under 4.5 s on purpose: a Scheduler task that stays alive for more than 5 s times out
-// and React then renders it without slicing (CLAIMS C11), which would turn round 2 into a long
-// frame on a slow laptop. The holds also let pending work finish between words.
-const TYPE_EVERY_MS = 140;
+// Auto-type: the round's 12 keys (same as typing by hand): two words, each followed by two holds
+// and a clear. 16 steps × 180 ms ≈ 2.9 s, well under 4.5 s on purpose: a Scheduler task alive for
+// more than 5 s times out and React renders it without slicing (CLAIMS C11). The holds let
+// pending work finish between words.
+const TYPE_EVERY_MS = 180;
 const TYPING_SCRIPT = (() => {
   const steps = [];
-  for (const word of ['tokyo', 'fiber', 'react', 'kyoto']) {
+  for (const word of ['tokyo', 'fiber']) {
     for (let i = 1; i <= word.length; i++) steps.push(word.slice(0, i));
     steps.push(null, null, ''); // hold (no event), hold, clear
   }
@@ -114,12 +116,39 @@ export function BossFight({ step }) {
     gameRef.current?.setCells(cells);
   }, [cells]);
 
+  // Warm-up: one untimed render of the whole list before every round (JIT and style caches are
+  // cold otherwise: we measured first keys of 274 ms and 525 ms). seq 0 = not a keystroke, so the
+  // game ignores these renders; they happen while the round is still in its READY state.
+  const warmUp = () => {
+    if (modeRef.current.key === 'deferred') {
+      flushSync(() => setText({ v: 'zq', seq: 0 }));
+      flushSync(() => setText({ v: '', seq: 0 }));
+    } else {
+      flushSync(() => setQuery({ v: 'zq', seq: 0 }));
+      flushSync(() => setQuery({ v: '', seq: 0 }));
+    }
+  };
+  const warmTimer = useRef(0);
+  const newRound = () => {
+    gameRef.current?.reset();
+    clearTimeout(warmTimer.current);
+    warmTimer.current = setTimeout(warmUp, 60);
+  };
+
   // New round whenever the mode changes; coming back from deferred mode, sync the list query.
   useEffect(() => {
     gameRef.current?.setRound(MODES.indexOf(mode), mode.title);
     if (mode.key !== 'deferred') setQuery(text);
+    clearTimeout(warmTimer.current);
+    warmTimer.current = setTimeout(warmUp, 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
+
+  // The clicker (next) during a fight ends the round early instead of changing the slide.
+  useEffect(() => {
+    if (replay) return undefined;
+    return setNextInterceptor(() => gameRef.current?.endEarly() === true);
+  }, [replay]);
 
   const clearing = useRef(false);
   const onChange = (e) => {
@@ -170,6 +199,7 @@ export function BossFight({ step }) {
   // Keyboard shortcuts. Registered once; they call the latest handlers through a ref.
   const handlers = useRef(null);
   handlers.current = {
+    newRound,
     autoType,
     clear,
     changeWork,
@@ -210,7 +240,8 @@ export function BossFight({ step }) {
       const h = handlers.current;
       if (e.key === 'a' || e.key === 'A') h.autoType();
       else if (e.key === 'c' || e.key === 'C') h.clear();
-      else if (e.key === 'r' || e.key === 'R') gameRef.current?.reset();
+      else if (e.key === 'r' || e.key === 'R') h.newRound();
+      else if (e.key === 'Enter') gameRef.current?.endEarly();
       else if (e.key === ']') h.changeWork(2);
       else if (e.key === '[') h.changeWork(-2);
       else if (e.key === 'i' || e.key === 'I') inputRef.current?.focus();
@@ -293,6 +324,13 @@ export function BossFight({ step }) {
           className="boss-input-field"
           value={text.v}
           onChange={onChange}
+          onKeyDown={(e) => {
+            // Enter ends the round early (at least 3 keys); it is not a keystroke of the round.
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              gameRef.current?.endEarly();
+            }
+          }}
           autoComplete="off"
           spellCheck={false}
           placeholder="type here…"

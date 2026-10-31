@@ -3,13 +3,17 @@
 //            input event happens and is resolved on the first animation frame after the
 //            commit that puts that keystroke's text in the DOM. Latency = that frame's time
 //            − event.timeStamp. Latency > 50 ms → it reaches the VILLAGE (your UI) and bites:
-//            one window goes dark. More than RULES.questFailBites bites → the village falls.
+//            one window goes dark and smoke rises.
+// A ROUND = a fixed number of keys (RULES.roundKeys), the same for auto-type and typing by hand,
+// shown as "keys 3 / 12". A pause never ends a round; the presenter may end it early (Enter or
+// the clicker) after at least RULES.minKeys keys. The village falls when, with at least minKeys
+// keys resolved, the bites reach RULES.failRatio of them; once fallen it stays fallen.
 //   DRAGON = the heavy list, one fiber per cell (setQuery / deferred query). Its HP = the
 //            keystrokes of this round the list has not rendered yet. Each real list commit is
 //            a slash that lands; the final commit (the one that shows the last keystroke)
 //            kills it.
-// The round's result is decided by the bites only (never by HP luck): more than
-// RULES.questFailBites bites = QUEST FAILED, even if the dragon went down.
+// The round's result is decided by the bite RATIO (never by how many keys were typed, never by
+// HP luck): village fallen = QUEST FAILED, even if the dragon went down.
 // The end of a round must be readable with the sound off and without reading:
 //   QUEST FAILED: the dragon falls, the village burns, goblins dance on the roofs, Fiber-kun
 //                 kneels with a broken sword, the arena turns grey.
@@ -27,19 +31,20 @@ import { play } from '../audio/sfx.js';
 
 export const RULES = {
   jankMs: 50, // a keystroke whose text needs longer than this to appear bites
-  questFailBites: 5, // more bites than this = QUEST FAILED (rank C)
-  idleEndMs: 1000, // manual typing: the round ends after 1 s without a keystroke
-  maxRoundMs: 20000, // safety net only
+  roundKeys: 12, // keys per round, auto-type and by hand
+  minKeys: 3, // the round can be ended early (Enter / clicker) after this many keys
+  failRatio: 0.5, // the village falls when bites >= 50% of the keys resolved (after minKeys)
+  maxRoundMs: 30000, // safety net only
 };
 
 // Rank, decided only by real numbers. In the speaker notes; the audience sees the scene.
-export function rankOf({ bites, worst }) {
-  if (bites === 0 && worst <= 100) return 'S';
-  if (bites <= 2 && worst <= 150) return 'A';
-  if (bites <= RULES.questFailBites) return 'B';
-  return 'C';
+export function rankOf({ bites, keys, worstKey, fallen }) {
+  if (fallen) return 'C';
+  if (bites === 0) return 'S';
+  if (bites / Math.max(1, keys) <= 0.1 && worstKey <= 100) return 'A';
+  return 'B';
 }
-export const RANK_RULE = 'S: 0 bites, no frame gap > 100 ms · A: ≤ 2 bites, ≤ 150 ms · B: ≤ 5 bites · C: more bites = QUEST FAILED';
+export const RANK_RULE = 'S: 0 bites · A: ≤ 10% of keys bite and worst key ≤ 100 ms · B: fewer than 50% bite · C: ≥ 50% bite (after 3 keys) = QUEST FAILED';
 
 // Same boss, same workload, three looks.
 export const FORMS = [
@@ -78,7 +83,7 @@ const IMPACT_AT = DASH_MS + Math.round(SLASH_MS * ((CONTACT_ANGLE + 2.3) / 3.3))
 const WHITE_GOBLIN = Object.fromEntries(Object.entries(GOBLIN_PALETTE).map(([k]) => [k, '#ffffff']));
 
 // The village = your UI: a small castle on the ×12 grid (two towers, a wall, a gate), with six
-// lit windows, one per allowed bite. The sixth bite (more than questFailBites) makes it fall.
+// lit windows; each bite darkens one. It falls when the bite ratio reaches RULES.failRatio.
 const PX = 12;
 const TOWERS = [12, 180]; // x of the two towers, 6 PX wide
 const TOWER_TOP = ARENA.groundY - 11 * PX;
@@ -171,8 +176,10 @@ function freshRound() {
     firstSeq: 0,
     lastKeySeq: 0,
     lastKeyAt: 0,
-    typingTotal: 0, // auto-type announces how many keystrokes it will send
-    typingEndSeq: 0, // …and which one is the last
+    roundKeys: RULES.roundKeys, // smaller if the presenter ends the round early
+    resolved: 0, // keys whose text is on screen (resolved goblins)
+    fallen: false, // the village fell (sticky until the reset)
+    notice: null, // a short message, e.g. type more
     listSeq: 0,
     dragonHp: 0,
     dragonMax: 0,
@@ -215,11 +222,12 @@ export function createGame(els) {
   const g = { round: 0, modeTitle: '', form: FORMS[0], dragon: makeDragon(DEFAULT_CELLS), ...freshRound() };
 
   const keysInRound = () => (g.lastKeySeq ? g.lastKeySeq - g.firstSeq + 1 : 0);
+  const keyIndex = (seq) => seq - g.firstSeq + 1;
 
   function updateHud() {
     const max = Math.max(1, g.dragonMax);
     setWidth(els.hydraHpBar, g.phase === 'ready' ? 1 : g.dragonHp / max);
-    setText(els.hydraHpText, g.phase === 'ready' ? 'HP = keys not on screen' : `HP ${g.dragonHp} / ${g.dragonMax}`);
+    setText(els.hydraHpText, `keys ${keysInRound()} / ${g.roundKeys} · HP ${g.phase === 'ready' ? g.roundKeys : g.dragonHp}`);
     const t = g.phase === 'ready' ? 0 : (g.phase === 'fight' ? performance.now() : g.finishAt || g.resultAt) - g.startAt;
     setText(els.timer, `${(Math.max(0, t) / 1000).toFixed(1)} s`);
     setText(els.worstKey, g.latencies.length ? `${Math.round(g.worstKey)} ms` : '–');
@@ -237,6 +245,7 @@ export function createGame(els) {
         <div><b class="g">GOBLIN</b> = 1 keystroke</div>
         <div>late &gt; ${RULES.jankMs} ms → it <b class="r" style="white-space:nowrap">bites your UI</b></div>
         <div><b class="g">DRAGON</b> = the big list</div>
+        <div>${RULES.roundKeys} keys · half late → <b class="r">QUEST FAILED</b></div>
       </div>
       <div class="bo-start blink">type to start</div>`;
   }
@@ -268,7 +277,7 @@ export function createGame(els) {
     if (outcome === 'WIN') {
       g.fallAt = now;
       // The village already fell: the dragon is beaten but only kneels (no victory picture).
-      g.fallPose = g.bites > RULES.questFailBites ? 'kneel' : 'fall';
+      g.fallPose = g.fallen ? 'kneel' : 'fall';
       if (els.hydra) els.hydra.classList.add('is-collapsed'); // the canvas draws the fallen pose
     }
   }
@@ -276,8 +285,8 @@ export function createGame(els) {
   function end(now) {
     g.phase = 'result';
     g.resultAt = now;
-    const rank = rankOf({ bites: g.bites, worst: g.worst });
-    const questFailed = g.bites > RULES.questFailBites;
+    const rank = rankOf({ bites: g.bites, keys: Math.max(1, g.resolved), worstKey: g.worstKey, fallen: g.fallen });
+    const questFailed = g.fallen;
     const dur = Math.max(1, g.finishAt - g.startAt);
     const lat = g.latencies;
     g.result = {
@@ -289,7 +298,10 @@ export function createGame(els) {
       questFailed,
       rank,
       goblins: g.goblinCount,
+      keys: keysInRound(),
+      roundKeys: g.roundKeys,
       bites: g.bites,
+      biteRatio: Math.round((g.bites / Math.max(1, g.resolved)) * 100) / 100,
       biteDamage: g.biteDamage,
       worstLatencyMs: lat.length ? Math.round(Math.max(...lat)) : 0,
       medianLatencyMs: lat.length ? Math.round([...lat].sort((a, b) => a - b)[Math.floor(lat.length / 2)]) : 0,
@@ -364,13 +376,14 @@ export function createGame(els) {
 
   function dragonHpFor(seq) {
     // HP = keystrokes of this round the list has not rendered yet.
-    const total = g.typingTotal || keysInRound();
+    const total = g.roundKeys;
     const rendered = seq >= g.firstSeq ? seq - g.firstSeq + 1 : 0;
     return Math.max(0, total - rendered);
   }
 
+  // The final key of the round: the roundKeys-th key (or the last one, if ended early).
   function isFinal(seq) {
-    return g.typingEndSeq ? seq >= g.typingEndSeq : false;
+    return g.firstSeq > 0 && keyIndex(seq) >= g.roundKeys;
   }
 
   function scheduleDragonHit(now, seq, final) {
@@ -400,14 +413,27 @@ export function createGame(els) {
       g.dragon = makeDragon(cells);
       if (g.phase === 'ready') showReady();
     },
-    onTypingStart(total) {
-      if (g.phase === 'ready') g.typingTotal = total;
-    },
-    onTypingEnd(seq) {
-      g.typingEndSeq = seq;
-      // React may have committed the last keystroke before this event was recorded
-      // (discrete events can flush before the dispatch returns). Then that commit was the final one.
-      if (g.phase === 'fight' && g.listSeq >= seq && !g.finalScheduled) scheduleDragonHit(performance.now(), g.listSeq, true);
+    onTypingStart() {},
+    onTypingEnd() {},
+    // Enter or the clicker during a fight: end the round now (at least RULES.minKeys keys).
+    // Returns true if the click was used by the game (so the deck does not move on).
+    endEarly(now = performance.now()) {
+      if (g.phase === 'ready') return false;
+      if (g.phase !== 'fight') return g.phase === 'finishing';
+      const n = keysInRound();
+      if (n < RULES.minKeys) {
+        g.notice = { text: `type more (${n} / ${RULES.minKeys} keys)`, t0: now };
+        return true;
+      }
+      if (g.roundKeys !== n) {
+        g.roundKeys = n;
+        g.dragonMax = n;
+        g.dragonHp = Math.min(g.dragonHp, n);
+        g.dragonHpScheduled = Math.min(g.dragonHpScheduled, n);
+      }
+      // If the list already shows the last key, that commit was the final one.
+      if (g.listSeq >= g.lastKeySeq && !g.finalScheduled) scheduleDragonHit(now, g.listSeq, true);
+      return true;
     },
     // A keystroke: one urgent update. A goblin appears.
     onKey(e) {
@@ -415,7 +441,8 @@ export function createGame(els) {
         g.phase = 'fight';
         g.startAt = e.t;
         g.firstSeq = e.seq;
-        g.dragonMax = g.typingTotal || 1;
+        g.roundKeys = RULES.roundKeys;
+        g.dragonMax = g.roundKeys;
         g.dragonHp = g.dragonMax;
         g.dragonHpScheduled = g.dragonMax;
         if (els.overlay) {
@@ -424,10 +451,10 @@ export function createGame(els) {
         }
       }
       if (g.phase !== 'fight') return;
+      if (keyIndex(e.seq) > g.roundKeys) return; // the round is full: extra keys are not counted
       g.lastKeySeq = e.seq;
       g.lastKeyAt = e.t;
       g.goblinCount++;
-      if (!g.typingTotal) g.dragonMax = Math.max(g.dragonMax, keysInRound());
       g.goblins.push({ seq: e.seq, ts: e.ts, state: 'wait', committedAt: 0, t0: 0, born: e.t });
     },
     // The keystroke's text is in the DOM. Its goblin is resolved on the next frame.
@@ -479,11 +506,16 @@ export function createGame(els) {
           g.worstKey = Math.max(g.worstKey, latency);
           gb.latency = Math.round(latency);
           gb.t0 = now;
-          if (latency > RULES.jankMs) {
+          g.resolved++;
+          const late = latency > RULES.jankMs;
+          if (late) {
             gb.state = 'bite';
             gb.window = g.bites; // which window it will darken
             g.bites++;
-          } else {
+          }
+          // The village falls once the bite ratio is reached (with enough keys to judge).
+          if (!g.fallen && g.resolved >= RULES.minKeys && g.bites / g.resolved >= RULES.failRatio) g.fallen = true;
+          if (!late) {
             gb.state = 'dying';
             // Do not cancel a dash on the dragon that is already under way.
             const a = g.action;
@@ -535,7 +567,7 @@ export function createGame(els) {
         g.shake = 8;
         g.shakeAt = now;
         g.sparks.push({ x: CHEST[0], y: CHEST[1], t0: now, big: true });
-        const late = imp.final && g.bites > RULES.questFailBites;
+        const late = imp.final && g.fallen;
         if (imp.dmg > 0 || imp.final)
           g.floaters.push({ text: imp.final ? (late ? 'TOO LATE' : 'FINISH!') : `-${imp.dmg}`, x: CHEST[0] + 40, y: CHEST[1] - 90, t0: now, color: imp.final ? (late ? '#a3a9c2' : '#ffd166') : '#7dffc8', size: imp.final ? 72 : 52 });
         play('hit');
@@ -544,12 +576,7 @@ export function createGame(els) {
       g.impacts = g.impacts.filter((imp) => !imp.done);
 
       if (g.phase === 'fight') {
-        // Manual typing: no announced end, so the round ends after 1 s without keys,
-        // once the list shows the last keystroke. That last commit is the final blow.
-        if (!g.typingEndSeq && g.lastKeyAt && now - g.lastKeyAt > RULES.idleEndMs && g.listSeq >= g.lastKeySeq && !g.impacts.length) {
-          g.typingEndSeq = g.lastKeySeq;
-          scheduleDragonHit(now, g.lastKeySeq, true);
-        }
+        // A pause never ends a round. Only the key count, Enter/clicker, or the safety net do.
         if (now - g.startAt > RULES.maxRoundMs) finish(now, 'TIME UP');
       }
       if (g.phase === 'finishing' && now - g.finishAt > 900) end(now);
@@ -673,13 +700,20 @@ export function createGame(els) {
       }
       ctx.globalAlpha = 1;
 
+      if (g.notice && now - g.notice.t0 < 1500) {
+        ctx.font = '48px DotGothic16';
+        ctx.fillStyle = '#05071a';
+        ctx.fillText(g.notice.text, ARENA.w / 2 + 4, 330 + 4);
+        ctx.fillStyle = '#ffd166';
+        ctx.fillText(g.notice.text, ARENA.w / 2, 330);
+      }
       if (r) drawEnding(ctx, now, r);
     },
   };
 
   // ---------- the village (your UI): a small castle ----------
   function drawVillage(ctx, now) {
-    const fallen = g.bites > RULES.questFailBites;
+    const fallen = g.fallen;
     const stone = '#7a74ad';
     const light = '#9a94cc';
     const shade = '#565088';
@@ -733,7 +767,7 @@ export function createGame(els) {
   // The castle falls: fire on the towers and the wall, from the moment it falls until the reset.
   // Drawn after the goblins, so the goblins never hide it.
   function drawVillageFire(ctx, now) {
-    if (g.bites <= RULES.questFailBites) return;
+    if (!g.fallen) return;
     for (let p = 0; p < PERCHES.length; p++) {
       const { cx, top } = PERCHES[p];
       for (let k = 0; k < 5; k++) {
