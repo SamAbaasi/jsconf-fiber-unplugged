@@ -69,7 +69,7 @@ const HERO_SCALE = SCALES.boss.hero;
 const HERO_SIZE = 16 * HERO_SCALE;
 const SWORD = 1.05; // sword scale, matched to the hero size
 const REACH = 148; // slash arc radius = blade tip (142 px × SWORD)
-const HERO_HOME = 200; // about 27% of the arena: ~1.5 head-lengths of space before the mouth
+const HERO_HOME = 249; // Fiber-kun's centre at 30% of the arena width (same in every round)
 // Dash so the blade tip passes the dragon's chest at the contact frame (computed, not tuned).
 const CHEST = [DRAGON_BOX.x + DRAGON_POINTS.chest[0] * DESIGN_PX, DRAGON_BOX.y + DRAGON_POINTS.chest[1] * DESIGN_PX];
 const HEAD = [DRAGON_BOX.x + DRAGON_POINTS.head[0] * DESIGN_PX, DRAGON_BOX.y + DRAGON_POINTS.head[1] * DESIGN_PX];
@@ -79,7 +79,7 @@ const CONTACT_ANGLE = Math.atan2(CHEST[1] - HAND_Y, CHEST[0] - HAND_X);
 const HERO = { homeX: HERO_HOME, scale: HERO_SCALE, size: HERO_SIZE, dash: Math.round(HAND_X - (HERO_HOME + HERO_SIZE - 24)) };
 const GOBLIN_SCALE = SCALES.boss.goblin;
 const GOBLIN_W = 8 * GOBLIN_SCALE;
-const GOBLIN_SLOTS = [398, 452]; // waiting goblins: right of Fiber-kun; late ones run past him to the castle
+const GOBLIN_SLOTS = [452, 508]; // waiting goblins: right of Fiber-kun; late ones run past him to the castle
 const DASH_MS = 90;
 const SLASH_MS = 80;
 const RETURN_MS = 150;
@@ -94,6 +94,16 @@ const TOWERS = [12, 132]; // x of the two towers, 6 PX wide
 const TOWER_TOP = ARENA.groundY - 11 * PX;
 const WALL = { x: 84, w: 4 * PX, top: ARENA.groundY - 6 * PX };
 const WINDOWS = 6;
+// Crack lines in the stone, one per bite (6 px steps on the 12 px grid), in a fixed order.
+const crack = (x, y, steps) => steps.map(([dx, dy]) => [x + dx * 6, y + dy * 6]);
+const CRACKS = [
+  crack(TOWERS[0] + 8, ARENA.groundY - 108, [[0, 0], [1, 1], [1, 2], [2, 3], [2, 4], [3, 5]]),
+  crack(TOWERS[1] + 40, ARENA.groundY - 120, [[0, 0], [-1, 1], [-1, 2], [0, 3], [-1, 4], [-2, 5]]),
+  crack(84 + 6, ARENA.groundY - 66, [[0, 0], [1, 1], [2, 1], [3, 2], [4, 3]]),
+  crack(TOWERS[0] + 44, ARENA.groundY - 60, [[0, 0], [0, 1], [-1, 2], [-1, 3], [-2, 4]]),
+  crack(TOWERS[1] + 8, ARENA.groundY - 54, [[0, 0], [1, 1], [1, 2], [2, 3]]),
+  crack(84 + 18, ARENA.groundY - 30, [[0, 0], [-1, 1], [0, 2], [1, 3]]),
+];
 const ROOF_TOP = TOWER_TOP; // highest stone (kept for the text positions)
 // Where goblins stand once they got in, and where the fire burns: the two tower tops and the wall.
 const PERCHES = [
@@ -144,6 +154,22 @@ const FORM_COLORS = {
 const FALL_MS = 700;
 const ICE_HOLD = 400; // the frozen ice beam is held this long…
 const ICE_SHATTER = 300; // …then it shatters
+// The 《Yield》 shield (8 × 12, drawn on the ×12 grid like Fiber-kun): a pause sign on it.
+const SHIELD_PALETTE = { k: '#120c2c', s: '#9aa3c7', S: '#6b7396', g: '#34e0a1', w: '#ffffff' };
+const SHIELD = [
+  'kkkkkkkk',
+  'kssssssk',
+  'ksgsgssk',
+  'ksgsgssk',
+  'ksgsgsSk',
+  'ksgsgsSk',
+  'ksssssSk',
+  'kssssSSk',
+  '.ksssSk.',
+  '.kssSSk.',
+  '..kSSk..',
+  '...kk...',
+];
 const PUFF_MS = 480; // a puff of fire travels from the mouth to the shield (several in flight = a dotted stream)
 const FALL_STEPS = 8;
 const fallCache = new Map();
@@ -758,37 +784,32 @@ export function createGame(els) {
       ctx.fillStyle = light;
       for (let k = 0; k < 6; k += 2) ctx.fillRect(tx + k * PX, TOWER_TOP - PX, PX, PX);
     }
-    // The castle's flag says what it stands for: "your UI". When the castle falls, the flag
-    // turns grey and burns at the corner (it stays at the top, above the goblins).
+    // The flag = the castle's health bar: "your UI". It empties as keys bite and is empty exactly
+    // when the castle falls (bite ratio ≥ failRatio, after minKeys keys).
+    const health = g.fallen ? 0 : Math.max(0, 1 - g.bites / Math.max(g.resolved, RULES.minKeys) / RULES.failRatio);
     const poleX = TOWERS[0] + PX;
     const poleTop = TOWER_TOP - 14 * PX;
     ctx.fillStyle = '#8a5a2b';
     ctx.fillRect(poleX, poleTop, PX / 2, TOWER_TOP - PX - poleTop);
-    const flagY = poleTop;
+    const flagX = poleX + PX / 2;
+    const flagW = 13 * PX;
     const wave = fallen ? 0 : (Math.floor(now / 250) % 2) * 4;
-    ctx.fillStyle = fallen ? '#5a5a66' : '#34e0a1';
-    ctx.fillRect(poleX + PX / 2, flagY + wave, 13 * PX, 4 * PX);
-    ctx.fillStyle = fallen ? '#3a3a44' : '#1d8f6a';
-    ctx.fillRect(poleX + PX / 2, flagY + wave + 4 * PX - 6, 13 * PX, 6);
+    ctx.fillStyle = '#120c2c'; // outline / empty part
+    ctx.fillRect(flagX, poleTop + wave, flagW, 4 * PX);
+    ctx.fillStyle = fallen ? '#5a5a66' : health > 0.5 ? '#34e0a1' : '#ffd166';
+    ctx.fillRect(flagX + 3, poleTop + wave + 3, Math.round((flagW - 6) * health), 4 * PX - 6);
     ctx.font = '32px DotGothic16';
-    ctx.fillStyle = fallen ? '#c9c9d2' : '#120c2c';
-    ctx.fillText('your UI', poleX + PX / 2 + 6.5 * PX, flagY + wave + 2 * PX);
-    if (fallen) {
-      const flick = Math.floor(now / 90) % 3;
-      ctx.fillStyle = flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
-      ctx.fillRect(poleX + 12 * PX, flagY - PX - flick * 4, PX, 2 * PX + flick * 4);
-      ctx.fillRect(poleX + 11 * PX, flagY + 2 * PX - flick * 4, PX, PX + flick * 4);
-    }
-    // Windows are dark (no lights). Each bite = a small fire at the next window.
+    ctx.fillStyle = health > 0.35 ? '#120c2c' : '#c9cdf5';
+    ctx.fillText('your UI', flagX + flagW / 2, poleTop + wave + 2 * PX);
+    // Windows: dark, no lights. Each bite = a crack in the stone (fixed places, in order).
     for (let i = 0; i < WINDOWS; i++) {
       const wr = windowRect(i);
       ctx.fillStyle = '#1a1430';
       ctx.fillRect(wr.x, wr.y, wr.w, wr.h);
-      if (i < g.darkWindows) {
-        const flick = Math.floor(now / 90 + i) % 3;
-        ctx.fillStyle = flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
-        ctx.fillRect(wr.x + 2, wr.y - flick * 4, wr.w - 4, wr.h + flick * 4);
-      }
+    }
+    ctx.fillStyle = '#1a1430';
+    for (let i = 0; i < Math.min(g.darkWindows, CRACKS.length); i++) {
+      for (const [cx, cy] of CRACKS[i]) ctx.fillRect(cx, cy, PX / 2, PX / 2);
     }
   }
 
@@ -976,11 +997,12 @@ export function createGame(els) {
       if (!shatter) {
         ctx.globalAlpha = 0.92;
         ctx.fillRect(c.gx, c.gy, PX, PX);
-      } else if (((c.gx + 3 * c.gy) / PX) % 3 === 0) {
-        // shards fly away from the beam's axis and fall
-        const dir = c.k >= 0 ? 1 : -1;
-        const sx = c.gx + (-L.uy * dir) * shatter * 90;
-        const sy = c.gy + (L.ux * dir) * shatter * 90 + shatter * shatter * 160;
+      } else if (((c.gx * 7 + c.gy * 13) / PX) % 4 === 0) {
+        // shards: every 4th block flies off in its own direction (fixed per block), then falls
+        const h = ((c.gx * 31 + c.gy * 17) / PX) % 8;
+        const ang = (h / 8) * Math.PI * 2;
+        const sx = c.gx + Math.cos(ang) * shatter * 110;
+        const sy = c.gy + Math.sin(ang) * shatter * 70 + shatter * shatter * 90;
         ctx.globalAlpha = 1 - shatter;
         ctx.fillRect(Math.round(sx / PX) * PX, Math.round(sy / PX) * PX, PX, PX);
       }
@@ -1025,17 +1047,15 @@ export function createGame(els) {
       }
     }
     ctx.globalAlpha = 1;
-    // the 《Yield》 shield
-    const top = ARENA.groundY - HERO.size - 2 * PX;
-    ctx.fillStyle = 'rgba(52, 224, 161, 0.35)';
-    ctx.fillRect(shieldX, top, PX, HERO.size + 2 * PX);
-    ctx.fillStyle = '#34e0a1';
-    ctx.fillRect(shieldX, top, PX / 2, HERO.size + 2 * PX);
+    // the 《Yield》 shield: a pixel shield held in front of Fiber-kun, a pause sign on it
+    const sh = spriteCanvas(SHIELD, SHIELD_PALETTE, PX);
+    const sy = ARENA.groundY - HERO.size + PX;
+    ctx.drawImage(sh, shieldX - PX, sy);
     ctx.font = '32px DotGothic16';
     ctx.fillStyle = '#05071a';
-    ctx.fillText('《Yield》', shieldX + 3, top - 22 + 3);
+    ctx.fillText('《Yield》', shieldX - PX + sh.width / 2 + 3, sy - 24 + 3);
     ctx.fillStyle = '#34e0a1';
-    ctx.fillText('《Yield》', shieldX, top - 22);
+    ctx.fillText('《Yield》', shieldX - PX + sh.width / 2, sy - 24);
   }
 
   // ---------- end-of-round scene, readable without text or sound ----------
