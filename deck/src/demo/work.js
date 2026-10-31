@@ -14,7 +14,23 @@ function spin(iters) {
   sink ^= x;
 }
 
+let calibrated = false;
+export function ensureCalibrated() {
+  if (!calibrated) calibrate();
+}
+
+// Iterations of the work loop that take about `us` microseconds on this machine.
+export function itersFor(us) {
+  ensureCalibrated();
+  return Math.round(itersPerMicro * us);
+}
+
+export function burnIters(iters) {
+  spin(iters);
+}
+
 export function calibrate() {
+  calibrated = true;
   // Warm up the JIT, then measure.
   spin(200000);
   let iters = 0;
