@@ -738,9 +738,9 @@ export function createGame(els) {
       const [hx] = headPoint(now);
       ctx.font = '40px DotGothic16';
       ctx.fillStyle = '#05071a';
-      ctx.fillText('RESPAWN AT ROOT', hx + 3, 403);
+      ctx.fillText('RESPAWN AT ROOT', hx + 3, 463);
       ctx.fillStyle = '#9af5ea';
-      ctx.fillText('RESPAWN AT ROOT', hx, 400);
+      ctx.fillText('RESPAWN AT ROOT', hx, 460);
     }
 
     ctx.save();

@@ -40,13 +40,13 @@ Genre words that are **not** extra metaphors (they are framing): LEVEL UP, skill
 | 2:15 | The Gate = the main thread | 1:15 | **Built** |
 | 3:30 | Floor 1 · Lv1 STATUS | 2:30 | **Built** |
 | 6:00 | Floor 2 · Lv2 《Yield》 外れスキル | 3:30 | **Built** |
-| 9:30 | Floor 3 · Lv3 Guild quest board (lanes) | 3:00 | Placeholder |
-| 12:30 | Floor 4 · Lv4 Respawn (interrupt) | 2:00 | Placeholder |
-| 14:30 | Floor 5 · Lv5 Expeditions (transition / deferred) | 2:30 | Placeholder |
+| 9:30 | Floor 3 · Lv3 Guild quest board (lanes) | 3:00 | **Built (3b)** |
+| 12:30 | Floor 4 · Lv4 Respawn (interrupt) | 2:00 | **Built (3b)** |
+| 14:30 | Floor 5 · Lv5 Expeditions (transition / deferred) | 2:30 | **Built (3b)** |
 | 17:00 | Boss room (live) | 5:00 | **Built** |
 | 22:00 | Patch Notes v1.1 | 1:45 | Built (Phase 2.5) |
 | 23:45 | 図鑑 bestiary (recap) | 1:15 | **Built** |
-| 25:00 | 仲間募集 ending (DRAFT, optional) | 0:30 | **Built** |
+| 25:00 | 仲間にしますか？ ending | 0:30 | **Built (3b)** |
 | 25:30 | end of content · 4:30 buffer | | |
 
 ---
@@ -173,6 +173,14 @@ DRAFT: "This is the whole talk on one page. Take a photo."
 DRAFT: "Thank you. ありがとうございました." (Japanese not added to the deck until Saman approves it.)
 
 ---
+
+## Phase 3b changes (approved by Saman)
+
+- **Gate ranks removed.** A Gate shows only its measured duration and turns red at ≥ 50 ms ("LONG TASK · spec"). The Gate slide's step 2 is now "one task = one Gate" with the truck's measured time and the 50 ms line.
+- **Boss room: 6 steps.** Round 1 → REPLAY 1 → Round 2 → REPLAY 2 → Round 3 → REPLAY 3. The replay is the round's real timeline (whole round + 300 ms zoom), with one takeaway line (DRAFT). Rounds type for 4.48 s (C11). The village (your UI) is on screen; the end of each round is readable without text or sound.
+- **Floors 3–5 built** as planned above; claim IDs only in the notes (and a hidden appendix, `?appendix`).
+- **"Effect: pause work."** replaces "Effect: stop working." (Saman approved).
+- **Ending:** 「Fiber-kunが 仲間に なりたそうに こちらを見ている！」 → 仲間にしますか？ ▶はい いいえ; the click chooses はい (jump + jingle). Name, four links, QR (LinkedIn, generated at build time). Replaces 仲間募集.
 
 ## Notes on the brief
 

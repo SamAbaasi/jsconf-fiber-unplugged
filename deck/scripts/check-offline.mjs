@@ -295,6 +295,22 @@ if (args.includes('--record')) {
   const file = readdirSync(videoDir).find((f) => f.endsWith('.webm'));
   if (file) renameSync(path.join(videoDir, file), path.join(outDir, 'boss-rounds.webm'));
 }
+// ---------- recording: the ending (question, then はい) ----------
+if (args.includes('--record')) {
+  const videoDir = path.join(outDir, 'video-ending');
+  mkdirSync(videoDir, { recursive: true });
+  const context = await newContext({ recordVideo: { dir: videoDir, size: { width: 1280, height: 720 } } });
+  const page = await context.newPage();
+  watch(page, 'record-ending');
+  await page.goto(`${url}#/12/0`);
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(3000);
+  await page.keyboard.press('PageDown');
+  await page.waitForTimeout(3000);
+  await context.close();
+  const file = readdirSync(videoDir).find((f) => f.endsWith('.webm'));
+  if (file) renameSync(path.join(videoDir, file), path.join(outDir, 'ending.webm'));
+}
 
 // QR on the ending slide: decode it from a real screenshot and compare with the URL.
 {
