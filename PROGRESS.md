@@ -102,3 +102,33 @@
 | 3 · useDeferredValue | 12 | **S ×8, A ×3, B ×1** | the misses were single 59–91 ms frames |
 
 Runs = the 5-run `--stability` test + 3 walk-through runs (round 1) / 3 walk-through + 4 fresh-page runs (rounds 2–3). A fresh page did not help round 3 (S ×3, A ×1), so it is not garbage from earlier rounds. The long frames are probably commits repainting thousands of cells without a GPU. With the screen recorder running, rounds 2–3 drop to A or B with TIME UP (~40 fps); the recordings show that truthfully.
+
+## Phase 2.7: goblins, dragon, calibration (2026-10-31)
+
+**Fixes**
+- **No TIME UP in a winning round:** the dragon dies on the **final real commit** of the round (the commit that shows the last keystroke). Rounds 2–3 end at ~6.2 s with "DRAGON DOWN".
+- **Truck scene:** horn + entrance in 0.45 s (no dead air); the real freeze is now ~1.15–1.47 s (260 µs × 5,000 components, measured); the fps counter honestly reads ~1 right after.
+- **Hero:** Fiber-kun 256 px, in the middle; the dragon (10,000 cells at 4 px) is 500×320.
+
+**New**
+- **Truck isekai:** no human. Fiber-kun's previous life is a tired salaryman (no headband, tired eyes, necktie, briefcase). The giant truck is 576 px tall (3×), with headlight beams. White flash → another world (an original field and castle) → Fiber-kun reborn with headband and sword → title.
+- **Goblins + dragon** (replace the Hydra):
+  - **Goblin** = one keystroke (urgent `setText`, SyncLane). It is resolved on the first frame after its text commit; latency = that frame − `event.timeStamp`; > 50 ms → it bites for that latency.
+  - **Dragon** = the 10,000-fiber list; HP = keystrokes not rendered yet; each real list commit = a dash + slash that lands on its chest (white flash, knockback, spark, number at the contact point); the final commit kills it.
+  - RESPAWN AT ROOT only on real thrown-away renders. Floating text sits above (or beside) Fiber-kun, never on his face. No hitstop.
+- **Calibration (K)**, `?work=N`, and the calibration section in `RUNBOOK.md`. A headless test of K picked 12 µs in 2.6 min (R1 C×5, R2 S×5, R3 S×5).
+- **Frame strip** (`deck/scripts/frame-strip.mjs`, CDP screencast, 8 fps): one dragon hit and one goblin kill, contact at 0 ms.
+- **Test matrix** (`deck/scripts/test-conditions.mjs`).
+
+**Test matrix at the default 12 µs** (5 runs × 3 rounds per condition; rank counts):
+
+| Condition | Round 1 | Round 2 | Round 3 |
+|---|---|---|---|
+| a · normal headless 1920×1080 | C ×5 | **S ×5** | S ×5 |
+| b · with video recording | C ×5 | **S ×5** | S ×5 |
+| c · CPU 2× | C ×5 | **S ×4**, B ×1 | S ×5 |
+| c · CPU 4× | C ×5 | B ×5 | B ×4, A ×1 |
+| d · deviceScaleFactor 1 | C ×5 | S ×5 | S ×4, B ×1 |
+| d · deviceScaleFactor 2 | C ×5 | S ×5 | S ×4, A ×1 |
+
+Goal (R1 = C and R2 = S in ≥ 4/5 for a, b, c-2×) is met at 12 µs, so no tuning was needed. At 4×, round 2 has 0–1 bites but frames of 150–330 ms. Lower work does not fix it: at 6 µs R2 = A ×2, B ×3; at 2 µs R2 = B ×5. The long frames are not in the sliced render; my best guess is the commit (thousands of cell class changes + paint) and the canvas drawing, all 4× slower. On such a laptop the calibration would honestly report "no value works".

@@ -125,6 +125,21 @@ All source links point at the tag: `https://github.com/facebook/react/blob/v19.3
 
 ---
 
+## K. The boss fight: what each game element stands for
+
+Not new claims; this maps the game to the rows above, so every joke has a source.
+
+| Game element | What it really is | Rows |
+|---|---|---|
+| **Goblin** | One keystroke = one urgent update (`setText`). A discrete `input` event → **SyncLane**, rendered in a microtask, never sliced. | D2, C2, A4 |
+| Goblin killed between slices (rounds 2–3) | The heavy list renders in 5 ms slices; between two slices the browser runs the input event, and the keystroke's SyncLane render interrupts the transition. | A2, B1, C1, C4, C5, B2 |
+| Goblin bites (round 1) | Without a transition, the text and the list render in the same sync render, so the text only appears after the whole list. Latency = first frame after the text commit − `event.timeStamp` (measured, not a React claim). | A1, A4 |
+| **Dragon** | The heavy render of 10,000 fibers (`setQuery` in a transition, or the deferred query). | A4, E4, F1 |
+| RESPAWN AT ROOT | A render attempt thrown away before it committed: React restarts the transition from the root. | B2, B6 |
+| Dragon dies on the final commit | The commit that shows the last keystroke; earlier attempts may have been thrown away, only commits count. | B2, E4 |
+
+The game rules (50 ms bite line, HP values, rank thresholds) are mine, not React's. They are fixed in `deck/src/demo/game.js` and shown on screen.
+
 ## Corrections to say on stage ("When I wrote Part N, I got this wrong")
 
 | # | Article | What it said | What the source does | Where in talk |
