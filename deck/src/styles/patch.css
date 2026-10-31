@@ -1,9 +1,9 @@
-.pn { position: absolute; inset: 0; padding: 60px 100px; background: linear-gradient(#0c1030, #070a1f); }
-.pn-head { display: flex; align-items: baseline; gap: 40px; border-bottom: 6px solid var(--rank-s); padding-bottom: 14px; margin-bottom: 30px; }
+.pn { position: absolute; inset: 0; padding: 40px 100px; background: linear-gradient(#0c1030, #070a1f); }
+.pn-head { display: flex; align-items: baseline; gap: 40px; border-bottom: 6px solid var(--rank-s); padding-bottom: 10px; margin-bottom: 20px; }
 .pn-title { font-size: 96px; color: var(--rank-s); text-shadow: 6px 6px 0 #000; }
 .pn-sub { font-size: 48px; color: var(--muted); }
-.pn-list { display: flex; flex-direction: column; gap: 22px; }
-.pn-entry { display: flex; gap: 30px; align-items: flex-start; min-height: 170px; padding: 14px 24px; background: rgba(255, 255, 255, 0.04); border-left: 8px solid var(--rank-d); }
+.pn-list { display: flex; flex-direction: column; gap: 12px; }
+.pn-entry { display: flex; gap: 30px; align-items: flex-start; min-height: 150px; padding: 10px 24px; background: rgba(255, 255, 255, 0.04); border-left: 8px solid var(--rank-d); }
 .pn-entry.is-empty { background: transparent; border-left-color: transparent; }
 .pn-part { flex: none; width: 170px; padding: 4px 0; text-align: center; font-size: 36px; color: #00140c; background: var(--rank-d); border-radius: 6px; }
 .pn-part.is-same { visibility: hidden; }
