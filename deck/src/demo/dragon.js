@@ -38,7 +38,7 @@ const NAMES = Array.from({ length: DEFAULT_CELLS }, () => {
 });
 
 // Points used by the game (impact point, head), in design-grid cells.
-export const DRAGON_POINTS = { head: [14, 20], chest: [46, 46] };
+export const DRAGON_POINTS = { head: [21, 28], chest: [46, 52], mouth: [7, 35] };
 
 // 0 bg · 1 body · 2 eye · 3 shade · 4 highlight · 5 mouth · 6 teeth/claws · 7 wing · 8 belly · 9 horn
 function segDist(x, y, ax, ay, bx, by) {
@@ -50,12 +50,11 @@ const inEllipse = (x, y, cx, cy, rx, ry) => ((x - cx) / rx) ** 2 + ((y - cy) / r
 function wingTop(x) {
   // Scalloped top edge of the wing between its bone tips.
   const tips = [
-    [58, 36],
-    [66, 4],
-    [82, 12],
-    [96, 0],
-    [110, 20],
-    [112, 36],
+    [56, 40],
+    [62, 8],
+    [80, 1],
+    [98, 20],
+    [100, 40],
   ];
   for (let i = 0; i < tips.length - 1; i++) {
     const [ax, ay] = tips[i];
@@ -68,41 +67,41 @@ function wingTop(x) {
   return Infinity;
 }
 
+// A compact dragon (design x 0…104): a short S-shaped neck, so the head sits close to the body
+// and the mouth is far enough from Fiber-kun for a breath. It faces left.
 function baseShape(x, y) {
-  // head and snout
-  const inHead = inEllipse(x, y, 18, 19, 10, 7) || inEllipse(x, y, 8, 23, 7, 4);
+  // head and snout, with an open mouth
+  const inHead = inEllipse(x, y, 22, 30, 9, 6.5) || inEllipse(x, y, 13, 33, 6.5, 3.8);
   if (inHead) {
-    if ((x === 14 || x === 15) && y === 17) return 2;
-    if (y === 25 && x >= 3 && x <= 13) return x % 2 === 0 ? 6 : 5;
-    if (y === 24 && x >= 3 && x <= 12) return 5;
+    if ((x === 20 || x === 21) && y === 28) return 2; // eye
+    if (y === 34 && x >= 7 && x <= 16) return x % 2 === 0 ? 6 : 5; // teeth
+    if (y >= 35 && x >= 7 && x <= 15) return 5; // open mouth
     return 1;
   }
-  // horns
-  // two horns that point back and apart (one straight horn read as a unicorn)
-  if (segDist(x, y, 22, 13, 36, 7) <= 1.6 || segDist(x, y, 15, 13, 19, 3) <= 1.5) return 9;
+  // two horns that point back and apart
+  if (segDist(x, y, 26, 25, 37, 18) <= 1.6 || segDist(x, y, 21, 24, 25, 15) <= 1.5) return 9;
   // wing bones and membrane (behind the body)
-  if (segDist(x, y, 62, 38, 66, 4) <= 1.2 || segDist(x, y, 62, 38, 96, 0) <= 1.2 || segDist(x, y, 62, 38, 110, 20) <= 1.2) return 1;
-  if (x >= 58 && x <= 112 && y >= wingTop(x) && y <= 40) return 7;
-  // neck
-  if (segDist(x, y, 50, 44, 24, 22) <= 6.5) return 1;
+  if (segDist(x, y, 60, 42, 62, 8) <= 1.2 || segDist(x, y, 60, 42, 80, 1) <= 1.2 || segDist(x, y, 60, 42, 98, 20) <= 1.2) return 1;
+  if (x >= 56 && x <= 100 && y >= wingTop(x) && y <= 44) return 7;
+  // S-shaped neck: body → back → forward to the head
+  if (segDist(x, y, 46, 48, 38, 44) <= 6.5 || segDist(x, y, 38, 44, 34, 38) <= 6 || segDist(x, y, 34, 38, 29, 33) <= 5.5) return 1;
   // body and belly
-  if (inEllipse(x, y, 72, 52, 28, 15)) return y > 55 && x < 92 ? 8 : 1;
-  // legs and claws
-  // A thick thigh, a bent shin and a foot with claws pointing forward (left), per leg.
-  for (const lx of [56, 86]) {
-    if (inEllipse(x, y, lx + 4, 63, 6.5, 6)) return 1;
-    if (segDist(x, y, lx + 5, 66, lx + 2, 75) <= 2.8) return 1;
+  if (inEllipse(x, y, 64, 54, 24, 14)) return y > 57 && x < 82 ? 8 : 1;
+  // legs: a thick thigh, a bent shin, a foot with claws pointing forward (left)
+  for (const lx of [50, 72]) {
+    if (inEllipse(x, y, lx + 4, 64, 6.5, 6)) return 1;
+    if (segDist(x, y, lx + 5, 67, lx + 2, 75) <= 2.8) return 1;
     if (x >= lx - 3 && x <= lx + 6 && y >= 75 && y <= 77) return 1;
     if (y >= 78 && (x === lx - 4 || x === lx - 3 || x === lx || x === lx + 1 || x === lx + 4)) return 6;
   }
-  // tail: tapering curve to a spade tip
-  for (let i = 0; i <= 24; i++) {
-    const t = i / 24;
-    const cx = 98 + t * 22;
-    const cy = 56 - Math.sin(t * Math.PI * 0.9) * 22;
+  // tail: a short curve up to a spade tip
+  for (let i = 0; i <= 20; i++) {
+    const t = i / 20;
+    const cx = 86 + t * 16;
+    const cy = 58 - Math.sin(t * Math.PI * 0.9) * 20;
     if (Math.hypot(x - cx, y - cy) <= 5 - t * 3.5) return 1;
   }
-  if (Math.abs(x - 121) + Math.abs(y - 36) <= 4) return 1;
+  if (Math.abs(x - 103) + Math.abs(y - 38) <= 3) return 1;
   return 0;
 }
 
@@ -131,7 +130,7 @@ const artRaw = Array.from({ length: ART.cols * ART.rows }, (_, i) => {
   return ax * 2 + 1 >= DESIGN.cols ? 0 : DESIGN_SHAPE[dy * DESIGN.cols + dx];
 });
 // Spikes along the top of the neck and back (every third art column): a dragon, not a horse.
-for (let ax = 10; ax < 30; ax += 3) {
+for (let ax = 14; ax < 24; ax += 3) {
   for (let ay = 0; ay < ART.rows; ay++) {
     const v = artRaw[ay * ART.cols + ax];
     if (v === 0) continue;
@@ -189,13 +188,13 @@ export function makeDragon(cells = DEFAULT_CELLS) {
 
 // The fallen pose, drawn from the same art (12 px pixels): legs fold, the body lowers onto the
 // ground, the neck droops until the head lies on the grass, the eyes close. t = 0 … 1.
-const LEG_COLS = [26, 49]; // art columns of the legs
+const LEG_COLS = [23, 42]; // art columns of the legs
 const BODY_BOTTOM = 34; // first art row below the belly
 export function fallenArt(t) {
   const out = new Array(ART.cols * ART.rows).fill(0);
   const drop = (ax) => {
     const base = 6;
-    const neck = ax < 26 ? (26 - ax) * 0.95 : 0;
+    const neck = ax < 24 ? (24 - ax) * 1.1 : 0;
     return Math.round(t * (base + neck));
   };
   for (let ay = 0; ay < ART.rows; ay++) {
@@ -216,7 +215,7 @@ export function fallenArt(t) {
 // already left. It does not lie down: it kneels, legs folded under it, head bowed, eyes open.
 export function kneelingArt(t) {
   const out = new Array(ART.cols * ART.rows).fill(0);
-  const drop = (ax) => Math.round(t * (3 + (ax < 26 ? (26 - ax) * 0.4 : 0)));
+  const drop = (ax) => Math.round(t * (3 + (ax < 24 ? (24 - ax) * 0.45 : 0)));
   for (let ay = 0; ay < ART.rows; ay++) {
     for (let ax = 0; ax < ART.cols; ax++) {
       const v = ART_SHAPE[ay * ART.cols + ax];
@@ -228,6 +227,23 @@ export function kneelingArt(t) {
         continue;
       }
       const ny = Math.min(ART.rows - 3, ay + drop(ax));
+      out[ny * ART.cols + ax] = v;
+    }
+  }
+  return { cols: ART.cols, rows: ART.rows, px: ART_PX, shape: out };
+}
+
+// Breathing fire: only the neck and head bend down (the body and legs stay), so the mouth is
+// near Fiber-kun's height and the flame can go straight. t = 0 … 1.
+// Neck and head bend down toward Fiber-kun; at t = 1 the mouth (art column 3) drops 13 rows.
+export const BREATH_DROP = (ax, t) => (ax < 24 ? Math.round(t * (24 - ax) * 0.62) : 0);
+export function breathArt(t) {
+  const out = new Array(ART.cols * ART.rows).fill(0);
+  for (let ay = 0; ay < ART.rows; ay++) {
+    for (let ax = 0; ax < ART.cols; ax++) {
+      const v = ART_SHAPE[ay * ART.cols + ax];
+      if (!v) continue;
+      const ny = Math.min(ART.rows - 1, ay + BREATH_DROP(ax, t));
       out[ny * ART.cols + ax] = v;
     }
   }

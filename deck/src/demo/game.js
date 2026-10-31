@@ -23,7 +23,7 @@ import { FIBER_KUN, FACES, PALETTE } from '../sprites/fiberkun.js';
 import { GOBLIN, GOBLIN_PALETTE } from '../sprites/goblin.js';
 import { drawSword } from '../sprites/sword.js';
 import { spriteCanvas } from '../ui/Sprite.jsx';
-import { makeDragon, fallenArt, kneelingArt, DESIGN, DESIGN_PX, DRAGON_PX, DRAGON_POINTS, DEFAULT_CELLS } from './dragon.js';
+import { makeDragon, fallenArt, kneelingArt, breathArt, BREATH_DROP, DESIGN, DESIGN_PX, DRAGON_PX, DRAGON_POINTS, DEFAULT_CELLS } from './dragon.js';
 import { SCALES, bbox, reportBox } from '../sprites/scale.js';
 import { analyzePhases } from './phases.js';
 import { eventLog } from '../instrument/eventLog.js';
@@ -62,12 +62,14 @@ export const ARENA = { w: 1150, h: SCALES.boss.arenaH, groundY: 690 };
 const DRAGON_W = DRAGON_PX.w;
 const DRAGON_H = DRAGON_PX.h;
 // Right edge 24 px inside the arena (5 px border), so the 12 px knockback never clips the tail.
-export const DRAGON_BOX = { x: ARENA.w - 5 - DRAGON_W - 24, y: ARENA.groundY - DRAGON_H, w: DRAGON_W, h: DRAGON_H };
+// The shape uses design columns 0…103 (the grid is wider; its empty right part is off-screen).
+const SHAPE_W = 104 * DESIGN_PX;
+export const DRAGON_BOX = { x: ARENA.w - 5 - SHAPE_W - 24, y: ARENA.groundY - DRAGON_H, w: DRAGON_W, h: DRAGON_H };
 const HERO_SCALE = SCALES.boss.hero;
 const HERO_SIZE = 16 * HERO_SCALE;
 const SWORD = 1.05; // sword scale, matched to the hero size
 const REACH = 148; // slash arc radius = blade tip (142 px × SWORD)
-const HERO_HOME = 216; // in front of the dragon's mouth, just right of the castle
+const HERO_HOME = 200; // about 27% of the arena: ~1.5 head-lengths of space before the mouth
 // Dash so the blade tip passes the dragon's chest at the contact frame (computed, not tuned).
 const CHEST = [DRAGON_BOX.x + DRAGON_POINTS.chest[0] * DESIGN_PX, DRAGON_BOX.y + DRAGON_POINTS.chest[1] * DESIGN_PX];
 const HEAD = [DRAGON_BOX.x + DRAGON_POINTS.head[0] * DESIGN_PX, DRAGON_BOX.y + DRAGON_POINTS.head[1] * DESIGN_PX];
@@ -77,7 +79,7 @@ const CONTACT_ANGLE = Math.atan2(CHEST[1] - HAND_Y, CHEST[0] - HAND_X);
 const HERO = { homeX: HERO_HOME, scale: HERO_SCALE, size: HERO_SIZE, dash: Math.round(HAND_X - (HERO_HOME + HERO_SIZE - 24)) };
 const GOBLIN_SCALE = SCALES.boss.goblin;
 const GOBLIN_W = 8 * GOBLIN_SCALE;
-const GOBLIN_SLOTS = [412, 472]; // waiting goblins: right of Fiber-kun; late ones run past him to the castle
+const GOBLIN_SLOTS = [398, 452]; // waiting goblins: right of Fiber-kun; late ones run past him to the castle
 const DASH_MS = 90;
 const SLASH_MS = 80;
 const RETURN_MS = 150;
@@ -140,12 +142,15 @@ const FORM_COLORS = {
   'form-3': { ...BASE_COLORS, 1: '#6a55a8', 3: '#44337a', 4: '#a796e6', 7: '#3a2a66', 8: '#a99ccf', 2: '#ff5d73' },
 };
 const FALL_MS = 700;
+const ICE_HOLD = 400; // the frozen ice beam is held this long…
+const ICE_SHATTER = 300; // …then it shatters
+const PUFF_MS = 480; // a puff of fire travels from the mouth to the shield (several in flight = a dotted stream)
 const FALL_STEPS = 8;
 const fallCache = new Map();
-function fallenCanvas(cls, k, kneel) {
-  const key = `${cls}:${k}:${kneel ? 'kneel' : 'fall'}`;
+function fallenCanvas(cls, k, pose) {
+  const key = `${cls}:${k}:${pose}`;
   if (fallCache.has(key)) return fallCache.get(key);
-  const art = (kneel ? kneelingArt : fallenArt)(k / FALL_STEPS);
+  const art = (pose === 'kneel' ? kneelingArt : pose === 'breath' ? breathArt : fallenArt)(k / FALL_STEPS);
   const colors = FORM_COLORS[cls] || BASE_COLORS;
   const c = document.createElement('canvas');
   c.width = art.cols * art.px;
@@ -215,7 +220,8 @@ function freshRound() {
     finishAt: 0,
     finalScheduled: false,
     fallAt: 0, // when the dragon started to fall
-    breath: null, // { t0, ms }: the last long frame
+    breath: null, // { t0, ms }: the last long frame (round 1: the ice beam)
+    puffs: [], // { t0 }: real Scheduler slices (rounds 2–3: puffs of fire)
     inputDelays: [],
     result: null,
     resultAt: 0,
@@ -485,7 +491,15 @@ export function createGame(els) {
       g.action = { kind: 'respawn', t0: performance.now() };
       play('respawn');
     },
-    onSliceEnd() {},
+    // A real Scheduler slice of the list render ended (rounds 2–3): one puff of fire.
+    onSliceEnd(t) {
+      if (g.phase !== 'fight' || t < g.startAt) return;
+      const now = performance.now();
+      const last = g.puffs[g.puffs.length - 1];
+      if (last && now - last.t0 < 20) return; // two slices in the same frame: one visible puff
+      g.puffs.push({ t0: now });
+      if (g.puffs.length > 40) g.puffs.shift();
+    },
     // ↑ key. `delay` = when we handled it minus when the browser created the event.
     manualJump(delay, now) {
       if (g.fkY < 0.5 && g.phase !== 'result') g.fkVy = 1500;
@@ -629,7 +643,7 @@ export function createGame(els) {
       if (g.fallAt) {
         const k = Math.min(FALL_STEPS, Math.floor(((now - g.fallAt) / FALL_MS) * FALL_STEPS));
         if (r && r.questFailed) ctx.filter = 'grayscale(0.9) brightness(0.8)';
-        ctx.drawImage(fallenCanvas(g.form.cls, k, g.fallPose === 'kneel'), DRAGON_BOX.x, DRAGON_BOX.y);
+        ctx.drawImage(fallenCanvas(g.form.cls, k, g.fallPose), DRAGON_BOX.x, DRAGON_BOX.y);
         ctx.filter = 'none';
       }
       // Hit flash: the dragon's silhouette in white, at the contact frame.
@@ -638,22 +652,6 @@ export function createGame(els) {
         ctx.drawImage(dragonSilhouette(g.dragon), DRAGON_BOX.x + 12, DRAGON_BOX.y);
         ctx.globalAlpha = 1;
       }
-      // Cut marks: the cells the last commit matched.
-      if (g.cuts && g.cuts.q && now - g.cuts.t0 < 700 && now - g.cuts.t0 > IMPACT_AT && !r) {
-        ctx.globalAlpha = 1 - (now - g.cuts.t0) / 700;
-        ctx.fillStyle = '#ffffff';
-        let n = 0;
-        const d = g.dragon;
-        for (let i = 0; i < d.cells && n < 90; i += 7) {
-          if (d.shape[i] && d.names[i].includes(g.cuts.q)) {
-            const [cx, cy] = cellPos(d, i);
-            for (let k = -2; k <= 2; k++) ctx.fillRect(cx + k * 3 - 2, cy - k * 3 - 2, 4, 4);
-            n++;
-          }
-        }
-        ctx.globalAlpha = 1;
-      }
-
       // A dragon that was never killed (TIME UP) laughs.
       if (r && !r.dragonDown) {
         ctx.font = '48px DotGothic16';
@@ -661,11 +659,22 @@ export function createGame(els) {
         ctx.fillText('HA! HA!', HEAD[0] + 40, HEAD[1] - 70 - Math.abs(Math.sin(now / 160)) * 16);
       }
 
-      if (g.breath && !g.fallAt && now - g.breath.t0 < 600) drawBreath(ctx, now, g.breath);
+      // Breath: while it lasts the canvas draws the dragon with its head down toward Fiber-kun,
+      // and the DOM grid is hidden. Round 1: a frozen ICE beam (drawn whole on the first frame
+      // after the long frame). Rounds 2–3: puffs of fire, one per real slice, on the 《Yield》 shield.
+      const iceAge = g.breath ? now - g.breath.t0 : Infinity;
+      const ice = iceAge < ICE_HOLD + ICE_SHATTER;
+      g.puffs = g.puffs.filter((p) => now - p.t0 < PUFF_MS);
+      const puffing = g.puffs.length > 0;
+      const breathing = !g.fallAt && (ice || puffing);
+      if (els.hydra && !g.fallAt) els.hydra.classList.toggle('is-breathing', breathing);
+      if (breathing) ctx.drawImage(fallenCanvas(g.form.cls, FALL_STEPS, 'breath'), DRAGON_BOX.x, DRAGON_BOX.y);
+      if (!g.fallAt && puffing) drawPuffs(ctx, now);
       drawVillage(ctx, now);
       drawGoblins(ctx, now);
       drawVillageFire(ctx, now);
       drawHero(ctx, now);
+      if (!g.fallAt && ice) drawIce(ctx, now, g.breath, iceAge);
 
       // Sparks and smoke at contact points.
       g.sparks = g.sparks.filter((s) => now - s.t0 < (s.smoke ? 500 : 220));
@@ -692,10 +701,12 @@ export function createGame(els) {
         const age = (now - h.t0) / 1300;
         ctx.globalAlpha = 1 - age * age;
         const y = ROOF_TOP - 230 - (list.length - 1 - i) * 46; // above the flag
+        ctx.textAlign = 'left';
         ctx.fillStyle = '#05071a';
-        ctx.fillText(h.text, 172, y + 4);
+        ctx.fillText(h.text, 20, y + 4);
         ctx.fillStyle = h.color;
-        ctx.fillText(h.text, 168, y);
+        ctx.fillText(h.text, 16, y);
+        ctx.textAlign = 'center';
       });
       ctx.globalAlpha = 1;
 
@@ -768,10 +779,16 @@ export function createGame(els) {
       ctx.fillRect(poleX + 12 * PX, flagY - PX - flick * 4, PX, 2 * PX + flick * 4);
       ctx.fillRect(poleX + 11 * PX, flagY + 2 * PX - flick * 4, PX, PX + flick * 4);
     }
+    // Windows are dark (no lights). Each bite = a small fire at the next window.
     for (let i = 0; i < WINDOWS; i++) {
       const wr = windowRect(i);
-      ctx.fillStyle = i < g.darkWindows ? '#1a1430' : '#ffd166';
+      ctx.fillStyle = '#1a1430';
       ctx.fillRect(wr.x, wr.y, wr.w, wr.h);
+      if (i < g.darkWindows) {
+        const flick = Math.floor(now / 90 + i) % 3;
+        ctx.fillStyle = flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
+        ctx.fillRect(wr.x + 2, wr.y - flick * 4, wr.w - 4, wr.h + flick * 4);
+      }
     }
   }
 
@@ -918,47 +935,107 @@ export function createGame(els) {
     drawSword(ctx, front, handY, angle, { scale: SWORD, flip: facingLeft });
   }
 
-  // ---------- dragon fire (one real long frame) ----------
-  function drawBreath(ctx, now, b) {
-    const age = (now - b.t0) / 600;
-    const mx = DRAGON_BOX.x + 3 * DESIGN_PX; // the mouth
-    const my = DRAGON_BOX.y + 24 * DESIGN_PX;
-    // A stream of fire: it leaves the mouth forward (to the left, where the head faces) and curves
-    // down onto Fiber-kun (a quadratic curve), full length at once: the freeze already happened.
-    const tx = heroX(now) + HERO.size / 2;
-    const ty = ARENA.groundY - HERO.size * 0.7;
-    const cx0 = mx - 150;
-    const cy0 = my + 10;
-    let prev = null;
-    let dist = 0;
-    for (let i = 0; i <= 60; i++) {
-      const u = i / 60;
-      const px0 = (1 - u) * (1 - u) * mx + 2 * (1 - u) * u * cx0 + u * u * tx;
-      const py0 = (1 - u) * (1 - u) * my + 2 * (1 - u) * u * cy0 + u * u * ty;
-      // direction of the curve here, for the width of the flame
-      const ddx = 2 * (1 - u) * (cx0 - mx) + 2 * u * (tx - cx0);
-      const ddy = 2 * (1 - u) * (cy0 - my) + 2 * u * (ty - cy0);
-      const dl = Math.hypot(ddx, ddy) || 1;
-      const nx = -ddy / dl;
-      const ny = ddx / dl;
-      if (prev) dist += Math.hypot(px0 - prev[0], py0 - prev[1]);
-      prev = [px0, py0];
-      const spread = 6 + u * 46;
-      for (let k = -spread; k <= spread; k += PX) {
-        const flick = Math.floor(now / 60 + i / 3 + k / PX) % 4;
-        if (flick === 3 && Math.abs(k) > spread * 0.6) continue;
-        ctx.globalAlpha = (1 - age * age) * 0.95;
-        ctx.fillStyle = Math.abs(k) < spread * 0.35 ? '#fff3b0' : flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
-        ctx.fillRect(Math.round((px0 + nx * k - PX / 2) / PX) * PX, Math.round((py0 + ny * k - PX / 2) / PX) * PX, PX, PX);
+  // ---------- the dragon's breath ----------
+  // The mouth when the head is down (art column 3, row 17 + the drop), and Fiber-kun's face.
+  function breathLine(now) {
+    const mx = DRAGON_BOX.x + 3 * PX + PX / 2;
+    const my = DRAGON_BOX.y + (17 + BREATH_DROP(3, 1)) * PX + PX / 2;
+    // aimed at his home spot (a dash is short; the breath does not follow him into the dragon)
+    const tx = HERO.homeX + HERO.size * 0.5;
+    const ty = ARENA.groundY - HERO.size * 0.55;
+    const len = Math.hypot(tx - mx, ty - my);
+    return { mx, my, tx, ty, len, ux: (tx - mx) / len, uy: (ty - my) / len };
+  }
+
+  // Round 1: nothing can move during the freeze, so the whole breath appears at once on the first
+  // frame after it, frozen: a crystal cone of ice from the mouth to Fiber-kun (as tall as he is at
+  // the end), frost on him, the measured time. Held 400 ms, then it shatters.
+  function drawIce(ctx, now, b, age) {
+    const L = breathLine(now);
+    const half = (d) => PX + (d / L.len) * (HERO.size * 0.55); // half-width, ≥ his height at the end
+    const cells = [];
+    const minX = Math.min(L.mx, L.tx) - HERO.size;
+    const maxX = Math.max(L.mx, L.tx) + PX;
+    const minY = Math.min(L.my, L.ty) - HERO.size;
+    const maxY = Math.max(L.my, L.ty) + HERO.size;
+    for (let gy = Math.floor(minY / PX) * PX; gy < maxY; gy += PX) {
+      for (let gx = Math.floor(minX / PX) * PX; gx < maxX; gx += PX) {
+        const cx = gx + PX / 2 - L.mx;
+        const cy = gy + PX / 2 - L.my;
+        const d = cx * L.ux + cy * L.uy; // along the beam
+        const k = -cx * L.uy + cy * L.ux; // across
+        if (d < 0 || d > L.len || Math.abs(k) > half(d)) continue;
+        cells.push({ gx, gy, d, k, w: half(d) });
       }
     }
-    ctx.globalAlpha = 1 - age;
-    ctx.font = '40px DotGothic16';
-    ctx.fillStyle = '#05071a';
-    ctx.fillText(`${b.ms} ms frozen`, mx + 150 + 3, my - 160 + 3);
-    ctx.fillStyle = '#ff9f1c';
-    ctx.fillText(`${b.ms} ms frozen`, mx + 150, my - 160);
+    const shatter = age > ICE_HOLD ? (age - ICE_HOLD) / ICE_SHATTER : 0;
+    for (const c of cells) {
+      const core = Math.abs(c.k) < c.w * 0.3;
+      const facet = ((c.gx + c.gy) / PX) % 5 === 0;
+      ctx.fillStyle = core ? '#ffffff' : facet ? '#e8fbff' : Math.abs(c.k) > c.w * 0.75 ? '#5fc9e8' : '#aef0ff';
+      if (!shatter) {
+        ctx.globalAlpha = 0.92;
+        ctx.fillRect(c.gx, c.gy, PX, PX);
+      } else if (((c.gx + 3 * c.gy) / PX) % 3 === 0) {
+        // shards fly away from the beam's axis and fall
+        const dir = c.k >= 0 ? 1 : -1;
+        const sx = c.gx + (-L.uy * dir) * shatter * 90;
+        const sy = c.gy + (L.ux * dir) * shatter * 90 + shatter * shatter * 160;
+        ctx.globalAlpha = 1 - shatter;
+        ctx.fillRect(Math.round(sx / PX) * PX, Math.round(sy / PX) * PX, PX, PX);
+      }
+    }
     ctx.globalAlpha = 1;
+    if (!shatter) {
+      // frost on Fiber-kun
+      const hx = HERO.homeX;
+      const hy = ARENA.groundY - HERO.size;
+      ctx.fillStyle = 'rgba(174, 240, 255, 0.45)';
+      ctx.fillRect(hx + PX, hy + 3 * PX, HERO.size - 2 * PX, HERO.size - 4 * PX);
+      ctx.fillStyle = '#ffffff';
+      for (const [ox, oy] of [[2, 4], [12, 5], [4, 13], [13, 12], [8, 3]]) ctx.fillRect(hx + ox * PX, hy + oy * PX, PX, PX);
+      ctx.font = '40px DotGothic16';
+      ctx.fillStyle = '#05071a';
+      ctx.fillText(`${b.ms} ms frozen`, (L.mx + L.tx) / 2 + 3, Math.min(L.my, L.ty) - 120 + 3);
+      ctx.fillStyle = '#aef0ff';
+      ctx.fillText(`${b.ms} ms frozen`, (L.mx + L.tx) / 2, Math.min(L.my, L.ty) - 120);
+    }
+  }
+
+  // Rounds 2–3: one puff of fire per real slice, from the mouth to the 《Yield》 shield in front of
+  // Fiber-kun. The gaps between puffs are the yields.
+  function drawPuffs(ctx, now) {
+    const L = breathLine(now);
+    const shieldX = HERO.homeX + HERO.size + PX;
+    const stop = Math.max(0, (L.mx - shieldX) / Math.max(1, L.mx - L.tx)) * L.len;
+    for (const p of g.puffs) {
+      const u = (now - p.t0) / PUFF_MS;
+      const d = u * stop;
+      const cx = L.mx + L.ux * d;
+      const cy = L.my + L.uy * d;
+      const r = 1; // small puffs: several in flight read as a dotted stream (gaps = yields)
+      for (let i = -r; i <= r; i++) {
+        for (let j = -r; j <= r; j++) {
+          if (i * i + j * j > r * r + 1) continue;
+          const flick = Math.floor(now / 60 + i + j) % 3;
+          ctx.globalAlpha = 1 - u * 0.4;
+          ctx.fillStyle = i === 0 && j === 0 ? '#fff3b0' : flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
+          ctx.fillRect(Math.round((cx + i * PX) / PX) * PX, Math.round((cy + j * PX) / PX) * PX, PX, PX);
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+    // the 《Yield》 shield
+    const top = ARENA.groundY - HERO.size - 2 * PX;
+    ctx.fillStyle = 'rgba(52, 224, 161, 0.35)';
+    ctx.fillRect(shieldX, top, PX, HERO.size + 2 * PX);
+    ctx.fillStyle = '#34e0a1';
+    ctx.fillRect(shieldX, top, PX / 2, HERO.size + 2 * PX);
+    ctx.font = '32px DotGothic16';
+    ctx.fillStyle = '#05071a';
+    ctx.fillText('《Yield》', shieldX + 3, top - 22 + 3);
+    ctx.fillStyle = '#34e0a1';
+    ctx.fillText('《Yield》', shieldX, top - 22);
   }
 
   // ---------- end-of-round scene, readable without text or sound ----------

@@ -28,7 +28,7 @@
 .boss-hydra { transform-origin: 85% 100%; }
 /* The dragon falls over (it did render): no fade. */
 /* The dragon falls (it did render): the fx canvas draws the fallen pose; the grid is hidden. */
-.boss-hydra.is-collapsed { visibility: hidden; }
+.boss-hydra.is-collapsed, .boss-hydra.is-breathing { visibility: hidden; }
 .boss-hydra.no-anim, .boss-hydra.no-anim * { transition: none !important; }
 .boss-arena.is-result .hud { opacity: 0; }
 /* QUEST FAILED: the world and the dragon turn grey; the village fire (fx canvas) keeps its colour. */
