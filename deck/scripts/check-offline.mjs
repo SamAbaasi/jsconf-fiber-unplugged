@@ -346,7 +346,9 @@ if (args.includes('--record')) {
   const rows = [];
   const cold = report.scaleMeasured?.['#/1/1']?.boxes?.['cold-open'] || {};
   const cold3 = report.scaleMeasured?.['#/1/3']?.boxes?.['cold-open'] || {};
-  const bossM = Object.entries(report.scaleMeasured || {}).find(([k]) => k.startsWith(`#/${BOSS}/`))?.[1];
+  // Boss: merge what all three rounds drew (a sprite may only appear in some rounds).
+  const bossAll = Object.entries(report.scaleMeasured || {}).filter(([k]) => k.startsWith(`#/${BOSS}/`)).map(([, v]) => v);
+  const bossM = bossAll.length ? { ...bossAll[0], boxes: { boss: Object.assign({}, ...bossAll.map((v) => v.boxes?.boss || {})) } } : undefined;
   const add = (name, v, min, max) => rows.push({ name, value: v == null ? null : Math.round(v * 1000) / 1000, min, max, ok: v != null && v >= min && v <= max });
   const hero = cold3.reborn?.h;
   const dev = cold.truck ? cold['previous-life']?.h : null;
