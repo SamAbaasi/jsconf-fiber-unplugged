@@ -91,6 +91,18 @@ export const LINES = {
   resultWinYield: { by: 'draft', text: '外れスキル? No. 《Yield》 won.', lang: 'ja-mixed', claims: ['A2', 'A4', 'B1'] },
   resultLoseSync: { by: 'draft', text: 'No yield here. Each key = one long render.', claims: ['A1', 'A4'] },
 
+  // Floors 3–5 (DRAFT)
+  f3Board: { by: 'draft', text: '31 slots. One bit each. Lower bit, more urgent.', claims: ['D1'] },
+  f3Events: { by: 'draft', text: 'The event decides the lane. A click is urgent. A timer is not.', claims: ['D2'] },
+  f3Emergency: { by: 'draft', text: 'An emergency quest never goes on the board. It runs right now, in a microtask.', claims: ['C2'] },
+  f3Expedition: { by: 'draft', text: 'Expeditions can rest. Emergency quests cannot.', claims: ['A4', 'C5', 'C6'] },
+  f4Arrive: { by: 'draft', text: 'Halfway through the list, a key arrives.', claims: ['B2'] },
+  f4Respawn: { by: 'draft', text: 'The key wins. My half-built tree is thrown away. I start again from the root.', claims: ['B2', 'B6'] },
+  f4Default: { by: 'draft', text: 'A timer cannot stop an expedition. It waits.', claims: ['B3'] },
+  f5Callback: { by: 'draft', text: 'startTransition runs the callback now. Only the render waits.', claims: ['E1', 'E2'] },
+  f5Deferred: { by: 'draft', text: 'First the old value, fast. Then the new value, later.', claims: ['F1', 'F2'] },
+  f5Guards: { by: 'draft', text: 'An expedition cannot wait forever.', claims: ['A5', 'C9', 'C11'] },
+
   // Boss room REPLAY step: one takeaway line per round (DRAFT).
   replaySync: { by: 'draft', text: 'One key = one long sync render. Every key waits.', claims: ['A1', 'A4', 'C2'] },
   replayTransition: { by: 'draft', text: 'The list renders in 5 ms slices. Keys cut in between.', claims: ['A2', 'A4', 'C4', 'B2'] },

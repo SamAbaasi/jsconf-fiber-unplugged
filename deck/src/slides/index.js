@@ -8,7 +8,7 @@ import { Title } from './Title.jsx';
 import { Gate } from './Gate.jsx';
 import { Status } from './Status.jsx';
 import { YieldSkill } from './YieldSkill.jsx';
-import { makePlaceholder } from './Placeholder.jsx';
+import { Floor3, Floor4, Floor5 } from './Floors.jsx';
 import { BossFight } from './BossFight.jsx';
 import { PatchNotes } from './PatchNotes.jsx';
 import { Bestiary } from './Bestiary.jsx';
@@ -95,59 +95,50 @@ export const slides = [
   },
   {
     id: 'floor3',
-    title: 'Floor 3 · Lv3 Quest board (placeholder)',
+    title: 'Floor 3 · Lv3 Quest board',
+    floor: 'FLOOR 3 · Lv 3',
     time: '9:30',
-    steps: 0,
-    Component: makePlaceholder({
-      floor: 'FLOOR 3 · Lv3',
-      title: 'Guild quest board',
-      real: 'Quest board = lanes (31-bit mask)',
-      rows: [
-        ['31 slots = 31 lanes. Lower bit, more urgent.', 'D1'],
-        ['The event picks the lane: click → Sync, scroll → InputContinuous, timer → Default.', 'D2'],
-        ['Emergency quest = SyncLane: never on the board, runs in a microtask.', 'C2'],
-        ['Expeditions (Transition lanes) rest: 5 ms, or when the browser needs to paint.', 'A4 C5 C6'],
-        ['LEVEL UP → Respawn', 'B2'],
-      ],
-    }),
+    steps: 4,
+    Component: Floor3,
     claims: ['D1', 'D2', 'C2', 'A4', 'C5', 'C6', 'B2'],
-    notes: 'Placeholder: built in a later phase. See STORYBOARD.md.',
+    notes: [
+      'D1: 31-bit lane mask; Sync = bit 1, InputContinuous = bit 3, Default = bit 5, Transition = bits 8–21, Idle = bit 28. DRAFT: 31 slots. One bit each. Lower bit, more urgent.',
+      '[CLICK] D2: click/keydown/input → Sync, scroll/mousemove → Continuous, setTimeout/fetch → Default. DRAFT: The event decides the lane. A click is urgent. A timer is not.',
+      '[CLICK] C2: SyncLane never enters the Scheduler queue; it runs in a microtask. DRAFT: An emergency quest never goes on the board. It runs right now, in a microtask.',
+      '[CLICK] A4, C5, C6: only non-blocking lanes are sliced; 5 ms per browser task (or needsPaint), then yield. DRAFT: Expeditions can rest. Emergency quests cannot.',
+      '[CLICK] LEVEL UP Lv3 → Lv4: Respawn (B2).',
+    ].join('\n'),
   },
   {
     id: 'floor4',
-    title: 'Floor 4 · Lv4 Respawn (placeholder)',
+    title: 'Floor 4 · Lv4 Respawn',
+    floor: 'FLOOR 4 · Lv 4',
     time: '12:30',
-    steps: 0,
-    Component: makePlaceholder({
-      floor: 'FLOOR 4 · Lv4',
-      title: 'Respawn',
-      real: 'Respawn = interrupt · prepareFreshStack',
-      rows: [
-        ['A keystroke arrives in the middle of a transition render.', 'B2'],
-        ['RESPAWN AT ROOT: the half-built tree is thrown away; the keystroke commits first; the transition restarts from the root.', 'B2 B1 B6'],
-        ['A Default update does not interrupt a transition. It waits.', 'B3'],
-      ],
-    }),
+    steps: 4,
+    Component: Floor4,
     claims: ['B1', 'B2', 'B3', 'B6'],
-    notes: 'Placeholder: built in a later phase. See STORYBOARD.md.',
+    notes: [
+      'B2: a SyncLane keystroke arrives while a transition render is half done. DRAFT: Halfway through the list, a key arrives.',
+      '[CLICK] B2, B6: prepareFreshStack; the keystroke commits first, then the transition starts again from the root. DRAFT: The key wins. My half-built tree is thrown away. I start again from the root.',
+      '[CLICK] B1 vs B2: yield continues from the same fiber; interrupt restarts from the root. DRAFT: Yield is a pause. Interrupt is a restart.',
+      '[CLICK] B3: a Default update (timer) does not interrupt a transition. DRAFT: A timer cannot stop an expedition. It waits.',
+      '[CLICK] LEVEL UP Lv4 → Lv5: Expedition.',
+    ].join('\n'),
   },
   {
     id: 'floor5',
-    title: 'Floor 5 · Lv5 Expeditions (placeholder)',
+    title: 'Floor 5 · Lv5 Expeditions',
+    floor: 'FLOOR 5 · Lv 5',
     time: '14:30',
-    steps: 0,
-    Component: makePlaceholder({
-      floor: 'FLOOR 5 · Lv5',
-      title: 'Expeditions',
-      real: 'Expedition = Transition lane',
-      rows: [
-        ['startTransition runs the callback now. Only the render it schedules waits.', 'E1 E2'],
-        ['useDeferredValue: old value first (urgent), new value later (deferred). Inside a transition it does not defer again.', 'F1 F2'],
-        ['After 5 s a waiting transition expires and stops yielding.', 'A5'],
-      ],
-    }),
-    claims: ['E1', 'E2', 'F1', 'F2', 'A5'],
-    notes: 'Placeholder: built in a later phase. See STORYBOARD.md.',
+    steps: 3,
+    Component: Floor5,
+    claims: ['E1', 'E2', 'F1', 'F2', 'A5', 'C9', 'C11'],
+    notes: [
+      'E1, E2: the startTransition callback runs synchronously; only the updates it schedules get a Transition lane. DRAFT: startTransition runs the callback now. Only the render waits.',
+      '[CLICK] F1, F2: useDeferredValue renders the old value first (urgent), then the new value in a deferred render; inside a transition it does not defer again. DRAFT: First the old value, fast. Then the new value, later.',
+      '[CLICK] A5: Transition lanes expire after 5000 ms and then render without slicing. C11 (say carefully): a Scheduler task alive past its 5 s timeout gets didTimeout, and React renders it with forceSync; React’s own comment calls this check defensive. That is why the boss rounds are under 4.5 s. DRAFT: An expedition cannot wait forever.',
+      '[CLICK] LEVEL UP: the boss room door.',
+    ].join('\n'),
   },
   {
     id: 'boss',
