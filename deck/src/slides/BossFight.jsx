@@ -2,28 +2,31 @@ import { useEffect, useRef, useState, useTransition, useDeferredValue } from 're
 import { HydraList } from '../demo/HydraList.jsx';
 import { calibrate, settings, setMicrosPerCell } from '../demo/work.js';
 import { startMonitor } from '../demo/monitor.js';
+import { createGame, ARENA } from '../demo/game.js';
+import { CELL_COUNT, countHits } from '../demo/hydra.js';
 import { record } from '../instrument/eventLog.js';
 import { isTyping } from '../engine/keys.js';
+import { LINES } from '../content/lines.js';
 import '../styles/boss.css';
 
 const MODES = [
   {
     key: 'sync',
     rank: 'S',
-    title: 'Round 1 · no transition',
-    code: ['onChange(e) {', '  setText(e.target.value);', '  setQuery(e.target.value);  // S rank', '}'],
+    title: 'no transition',
+    code: ['onChange(e) {', '  const v = e.target.value;', '  setText(v);   // S', '  setQuery(v);  // S', '}'],
   },
   {
     key: 'transition',
     rank: 'D',
-    title: 'Round 2 · useTransition',
-    code: ['onChange(e) {', '  setText(e.target.value);            // S rank', '  startTransition(() =>', '    setQuery(e.target.value));       // D rank', '}'],
+    title: 'useTransition',
+    code: ['onChange(e) {', '  const v = e.target.value;', '  setText(v);   // S', '  startTransition(() =>', '    setQuery(v));  // D', '}'],
   },
   {
     key: 'deferred',
     rank: 'D',
-    title: "Round 3 · useDeferredValue",
-    code: ['onChange(e) { setText(e.target.value); }', '', 'const q = useDeferredValue(text);', '<HydraList query={q} />'],
+    title: 'useDeferredValue',
+    code: ['onChange(e) {', '  setText(e.target.value); // S', '}', 'q = useDeferredValue(text);', '<HydraList query={q} /> // D'],
   },
 ];
 
@@ -39,10 +42,17 @@ const TYPING_SCRIPT = (() => {
 
 function typeInto(input, value) {
   // Same path as a real keystroke: a native "input" event, which React treats
-  // as a discrete event (SyncLane).
+  // as a discrete event (SyncLane, D2).
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   setter.call(input, value);
   input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+// The line under the result. Only shown when the real result matches it.
+function resultLine(r, modeKey) {
+  if (r.outcome === 'WIN' && modeKey !== 'sync') return LINES.resultWinYield.text;
+  if (r.outcome !== 'WIN' && modeKey === 'sync') return LINES.resultLoseSync.text;
+  return '';
 }
 
 export function BossFight({ step }) {
@@ -57,34 +67,35 @@ export function BossFight({ step }) {
   // Only fed while in deferred mode; otherwise it holds null and never defers.
   const deferredText = useDeferredValue(mode.key === 'deferred' ? text : null);
 
-  const refs = {
-    world: useRef(null),
-    timeline: useRef(null),
-    fpsGraph: useRef(null),
-    fps: useRef(null),
-    worst: useRef(null),
-    slices: useRef(null),
-    committed: useRef(null),
-    discarded: useRef(null),
-    lastRender: useRef(null),
-  };
+  const names = ['arena', 'world', 'fx', 'hydra', 'overlay', 'fkHpBar', 'fkHpText', 'hydraHpBar', 'hydraHpText', 'respawnText', 'timeline', 'fpsGraph', 'fps', 'worst'];
+  const refs = Object.fromEntries(names.map((n) => [n, useRef(null)]));
   const inputRef = useRef(null);
   const typingTimer = useRef(0);
+  const gameRef = useRef(null);
+  const modeRef = useRef(mode.key);
+  modeRef.current = mode.key;
 
   useEffect(() => {
-    const els = Object.fromEntries(Object.entries(refs).map(([k, r]) => [k, r.current]));
-    return startMonitor(els);
+    const els = Object.fromEntries(names.map((n) => [n, refs[n].current]));
+    els.resultLine = (r) => resultLine(r, modeRef.current);
+    const game = createGame(els);
+    gameRef.current = game;
+    const stop = startMonitor(els, game);
+    return stop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Coming back from deferred mode: make the list query match the input again.
+  // New round on every step; coming back from deferred mode, sync the list query again.
   useEffect(() => {
+    gameRef.current?.setRound(step, mode.title);
     if (mode.key !== 'deferred') setQuery(inputRef.current?.value ?? '');
-  }, [mode.key]);
+  }, [step, mode.key, mode.title]);
 
+  const clearing = useRef(false);
   const onChange = (e) => {
     const v = e.target.value;
-    record('key', { v });
+    // A keystroke starts a round; clearing the box with C does not.
+    if (!clearing.current) record('key', { v });
     if (mode.key === 'sync') {
       setText(v);
       setQuery(v);
@@ -100,23 +111,21 @@ export function BossFight({ step }) {
     clearInterval(typingTimer.current);
     typingTimer.current = 0;
   };
-
   const autoType = () => {
     stopTyping();
     const input = inputRef.current;
     let i = 0;
-    typeInto(input, '');
     typingTimer.current = setInterval(() => {
       typeInto(input, TYPING_SCRIPT[i++]);
       if (i >= TYPING_SCRIPT.length) stopTyping();
     }, 110);
   };
-
   const clear = () => {
     stopTyping();
+    clearing.current = true;
     typeInto(inputRef.current, '');
+    clearing.current = false;
   };
-
   const changeWork = (delta) => {
     setMicrosPerCell(settings.microsPerCell + delta);
     setMicros(settings.microsPerCell);
@@ -131,6 +140,7 @@ export function BossFight({ step }) {
       const h = handlers.current;
       if (e.key === 'a' || e.key === 'A') h.autoType();
       else if (e.key === 'c' || e.key === 'C') h.clear();
+      else if (e.key === 'r' || e.key === 'R') gameRef.current?.reset();
       else if (e.key === ']') h.changeWork(2);
       else if (e.key === '[') h.changeWork(-2);
       else if (e.key === 'i' || e.key === 'I') inputRef.current?.focus();
@@ -153,13 +163,39 @@ export function BossFight({ step }) {
         <div className="boss-modes">
           {MODES.map((m, i) => (
             <div key={m.key} className={`boss-mode rank-${m.rank} ${m.key === mode.key ? 'is-on' : ''}`}>
-              <span className="boss-mode-n">{i + 1}</span> {m.title}
+              {i + 1} · {m.title}
             </div>
           ))}
         </div>
       </header>
 
-      <canvas ref={refs.world} className="boss-world pixelated" width={1000} height={250} />
+      <div className="boss-arena" ref={refs.arena}>
+        <canvas ref={refs.world} className="boss-layer pixelated" width={ARENA.w} height={ARENA.h} />
+        <div className={`boss-hydra ${pending ? 'is-pending' : ''}`} ref={refs.hydra}>
+          <HydraList query={listQuery} />
+        </div>
+        <canvas ref={refs.fx} className="boss-layer boss-fx pixelated" width={ARENA.w} height={ARENA.h} />
+
+        <div className="hud hud-fk">
+          <div className="hud-name">Fiber-kun</div>
+          <div className="hud-bar">
+            <div className="hud-fill is-fk" ref={refs.fkHpBar} />
+          </div>
+          <div className="hud-num" ref={refs.fkHpText} />
+          <div className="hud-num hud-respawn" ref={refs.respawnText} />
+        </div>
+        <div className="hud hud-boss">
+          <div className="hud-name">JANK HYDRA</div>
+          <div className="hud-bar">
+            <div className="hud-fill is-boss" ref={refs.hydraHpBar} />
+          </div>
+          <div className="hud-num" ref={refs.hydraHpText} />
+          <div className="hud-num hud-sub">
+            {CELL_COUNT.toLocaleString('en-US')} fibers × {micros} µs
+          </div>
+        </div>
+        <div className="boss-overlay" ref={refs.overlay} />
+      </div>
 
       <div className="win boss-input">
         <label className="boss-input-label" htmlFor="boss-search">
@@ -175,11 +211,10 @@ export function BossFight({ step }) {
           spellCheck={false}
           placeholder="type here…"
         />
-        <div className={`boss-pending ${pending ? 'is-on' : ''}`}>{pending ? '⏳ pending' : ''}</div>
-      </div>
-
-      <div className={`boss-hydra ${pending ? 'is-pending' : ''}`}>
-        <HydraList query={listQuery} microsPerCell={micros} />
+        <div className="boss-hits">
+          hits <b>{countHits(listQuery)}</b>
+        </div>
+        <div className={`boss-pending ${pending ? 'is-on' : ''}`}>{pending ? 'pending…' : ''}</div>
       </div>
 
       <div className="win boss-fps" style={{ position: 'absolute' }}>
@@ -187,34 +222,27 @@ export function BossFight({ step }) {
         <div className="boss-fps-num" ref={refs.fps}>
           60
         </div>
-        <canvas ref={refs.fpsGraph} className="boss-fps-graph" width={480} height={110} />
+        <canvas ref={refs.fpsGraph} className="boss-fps-graph" width={400} height={110} />
         <div className="boss-fps-worst">
-          worst frame (3 s): <b ref={refs.worst}>–</b>
+          worst frame <b ref={refs.worst}>–</b>
         </div>
       </div>
 
       <div className="win boss-timeline" style={{ position: 'absolute' }}>
-        <div className="win-title">LIVE · real scheduler events</div>
-        <canvas ref={refs.timeline} width={760} height={300} />
+        <div className="win-title">LIVE · real scheduler</div>
+        <canvas ref={refs.timeline} width={650} height={316} />
         <div className="boss-legend">
-          <span className="lg lg-s">sync render (no task)</span>
-          <span className="lg lg-d">Normal task slice</span>
+          <span className="lg lg-s">sync</span>
+          <span className="lg lg-d">slice</span>
           <span className="lg lg-x">thrown away</span>
-          <span className="lg lg-r">blocked frame</span>
+          <span className="lg lg-r">long frame</span>
         </div>
       </div>
 
       <div className="win boss-code" style={{ position: 'absolute' }}>
         <div className="win-title">CODE</div>
         <pre className="boss-code-pre">{mode.code.join('\n')}</pre>
-        <div className="boss-stats">
-          <span>committed <b ref={refs.committed}>0</b></span>
-          <span>thrown away <b ref={refs.discarded}>0</b></span>
-          <span>slices (3 s) <b ref={refs.slices}>0</b></span>
-          <span>last render <b ref={refs.lastRender}>–</b></span>
-        </div>
       </div>
-
     </div>
   );
 }

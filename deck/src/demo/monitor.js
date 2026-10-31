@@ -3,14 +3,13 @@
 // Because everything here runs on the main thread, it freezes when React blocks
 // the main thread. That freeze is the thing we want the audience to see.
 import { readSince } from '../instrument/eventLog.js';
-import { FIBER_KUN, PALETTE } from '../sprites/fiberkun.js';
-import { spriteCanvas } from '../ui/Sprite.jsx';
+import { ARENA } from './game.js';
 
 const WINDOW_MS = 3000;
 const PRI_COLOR = { 1: '#ffd166', 2: '#ff5d73', 3: '#34e0a1', 4: '#4cc9f0', 5: '#a3a9c2' };
 const PRI_NAME = { 1: 'Immediate', 2: 'UserBlocking', 3: 'Normal', 4: 'Low', 5: 'Idle' };
 
-export function startMonitor(els) {
+export function startMonitor(els, game) {
   const state = {
     frames: [], // rAF timestamps
     tasks: new Map(), // id -> { pri, kind, slices: [{start, end}], open }
@@ -26,12 +25,19 @@ export function startMonitor(els) {
   state.readIndex = readSince(Infinity, () => {});
 
   let raf = 0;
-  const loop = (t) => {
+  let prev = performance.now();
+  const fx = els.fx ? els.fx.getContext('2d') : null;
+  const loop = () => {
     raf = requestAnimationFrame(loop);
     const now = performance.now();
     state.frames.push(now);
     while (state.frames.length && state.frames[0] < now - WINDOW_MS) state.frames.shift();
-    ingest(state, now);
+    ingest(state, now, game);
+    if (game) {
+      game.frame(now, prev);
+      if (fx) game.draw(fx, now);
+    }
+    prev = now;
     if (els.world) drawWorld(els.world, now);
     if (els.timeline) drawTimeline(els.timeline, state, now);
     if (els.fpsGraph) drawFpsGraph(els.fpsGraph, state, now);
@@ -44,7 +50,7 @@ export function startMonitor(els) {
   return () => cancelAnimationFrame(raf);
 }
 
-function ingest(state, now) {
+function ingest(state, now, game) {
   state.readIndex = readSince(state.readIndex, (e) => {
     switch (e.type) {
       case 'task:start': {
@@ -60,7 +66,10 @@ function ingest(state, now) {
         if (task && task.open) {
           task.open.end = e.t;
           task.open = null;
-          if (task.kind === 'render') state.slicesTotal++;
+          if (task.kind === 'render') {
+            state.slicesTotal++;
+            game?.onSliceEnd(e.t);
+          }
         }
         break;
       }
@@ -71,6 +80,7 @@ function ingest(state, now) {
           last.status = 'discarded';
           last.end = e.t;
           state.discarded++;
+          game?.onDiscard(e.t);
         }
         state.attempts.push({ start: e.t, end: null, q: e.q, sync: e.task === null, status: 'running' });
         break;
@@ -86,6 +96,7 @@ function ingest(state, now) {
       }
       case 'key':
         state.keys.push(e.t);
+        game?.onKey(e.t);
         break;
       default:
         break;
@@ -100,7 +111,7 @@ function ingest(state, now) {
   while (state.keys.length && state.keys[0] < cutoff) state.keys.shift();
 }
 
-// ---------- game world ----------
+// ---------- arena background ----------
 
 let worldCache = null;
 function worldLayers(w, h) {
@@ -109,59 +120,44 @@ function worldLayers(w, h) {
   sky.width = w;
   sky.height = h;
   const s = sky.getContext('2d');
-  const bands = ['#1b1550', '#24206a', '#2f2f86', '#3d47a3', '#5563bf', '#7383d6'];
+  const bands = ['#120f45', '#1b1660', '#24206f', '#2f2c86', '#3b3a9c', '#4a4bb0'];
   bands.forEach((c, i) => {
     s.fillStyle = c;
-    s.fillRect(0, (i * h * 0.62) / bands.length, w, (h * 0.62) / bands.length + 1);
+    s.fillRect(0, (i * ARENA.groundY) / bands.length, w, ARENA.groundY / bands.length + 1);
   });
-  // Far hills: a tileable pixel ridge, twice the width so it can scroll.
-  const hills = document.createElement('canvas');
-  hills.width = w * 2;
-  hills.height = h;
-  const g = hills.getContext('2d');
-  g.fillStyle = '#2a2370';
-  for (let x = 0; x < w * 2; x += 8) {
-    const y = h * 0.42 + Math.round((Math.sin((x / (w * 2)) * Math.PI * 6) * 18 + Math.sin((x / (w * 2)) * Math.PI * 14) * 8) / 8) * 8;
-    g.fillRect(x, y, 8, h - y);
+  // Pixel stars, fixed positions.
+  s.fillStyle = '#ffffff';
+  for (let i = 0; i < 60; i++) s.fillRect((i * 197) % w, (i * 89) % 300, i % 7 ? 3 : 6, i % 7 ? 3 : 6);
+  // Hills
+  s.fillStyle = '#231d66';
+  for (let x = 0; x < w; x += 8) {
+    const y = ARENA.groundY - 150 + Math.round((Math.sin(x / 90) * 30 + Math.sin(x / 37) * 10) / 8) * 8;
+    s.fillRect(x, y, 8, ARENA.groundY - y);
   }
-  g.fillStyle = '#1c1856';
-  for (let x = 0; x < w * 2; x += 8) {
-    const y = h * 0.55 + Math.round((Math.sin((x / (w * 2)) * Math.PI * 10 + 1) * 12) / 8) * 8;
-    g.fillRect(x, y, 8, h - y);
+  // Ground
+  for (let x = 0, k = 0; x < w; x += 32, k++) {
+    s.fillStyle = k % 2 ? '#2f7a3e' : '#38904a';
+    s.fillRect(x, ARENA.groundY, 32, h - ARENA.groundY);
   }
-  worldCache = { w, h, sky, hills };
+  s.fillStyle = '#5fd47a';
+  s.fillRect(0, ARENA.groundY, w, 6);
+  worldCache = { w, h, sky };
   return worldCache;
 }
 
 function drawWorld(canvas, now) {
   const ctx = canvas.getContext('2d');
   const { width: w, height: h } = canvas;
-  const { sky, hills } = worldLayers(w, h);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(sky, 0, 0);
-  const hx = -((now * 0.03) % w);
-  ctx.drawImage(hills, hx, 0);
-  ctx.drawImage(hills, hx + w * 2, 0);
-  // Ground: checker tiles that scroll fast, so a frozen frame is easy to see.
-  const groundY = Math.round(h * 0.78);
-  const tile = 24;
-  const off = (now * 0.18) % (tile * 2);
-  for (let k = 0, gx = -off; gx < w; k++, gx += tile) {
-    ctx.fillStyle = k % 2 ? '#3b8f4a' : '#46a957';
-    ctx.fillRect(Math.round(gx), groundY, tile, h - groundY);
+  ctx.drawImage(worldLayers(w, h).sky, 0, 0);
+  // Two clouds drifting: they only move when frames run.
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  for (let i = 0; i < 2; i++) {
+    const x = Math.round(((now * (0.02 + i * 0.015) + i * 500) % (w + 300)) - 300);
+    const y = 80 + i * 90;
+    ctx.fillRect(x, y, 220, 32);
+    ctx.fillRect(x + 40, y - 24, 120, 24);
   }
-  ctx.fillStyle = '#2b6b37';
-  ctx.fillRect(0, groundY, w, 4);
-  // Fiber-kun walks in place while the world scrolls.
-  const frames = FIBER_KUN.walk;
-  const frame = frames[Math.floor(now / 180) % frames.length];
-  const sprite = spriteCanvas(frame, PALETTE, 7);
-  ctx.drawImage(sprite, Math.round(w * 0.22), groundY - sprite.height + 6);
-  // A small coin that spins: another thing that only moves when frames run.
-  const coinX = Math.round(w * 0.62 + Math.sin(now / 400) * 6);
-  const coinW = Math.max(2, Math.round(Math.abs(Math.cos(now / 160)) * 18));
-  ctx.fillStyle = '#ffd166';
-  ctx.fillRect(coinX - coinW / 2, groundY - 70, coinW, 22);
 }
 
 // ---------- FPS graph ----------
@@ -190,9 +186,9 @@ function drawFpsGraph(canvas, state, now) {
 // ---------- scheduler timeline ----------
 
 const LANES = [
-  { label: 'input', y: 6 },
-  { label: 'React render', y: 38 },
-  { label: 'Scheduler', y: 80 },
+  { label: 'keys', y: 6 },
+  { label: 'render', y: 40 },
+  { label: 'tasks', y: 80 },
   { label: 'frames', y: 132 },
 ];
 const ZOOM_MS = 120;
@@ -201,14 +197,14 @@ const ZOOM_Y = 196;
 function drawTimeline(canvas, state, now) {
   const ctx = canvas.getContext('2d');
   const { width: w, height: h } = canvas;
-  const labelW = 150;
+  const labelW = 112;
   const plotW = w - labelW - 8;
   const x = (t) => labelW + ((t - (now - WINDOW_MS)) / WINDOW_MS) * plotW;
   const pxPerMs = plotW / WINDOW_MS;
 
   ctx.fillStyle = '#0a0f2e';
   ctx.fillRect(0, 0, w, h);
-  ctx.font = '18px "JetBrains Mono", monospace';
+  ctx.font = '24px "JetBrains Mono", monospace';
   ctx.textBaseline = 'middle';
 
   // Lane labels and grid (one line every 500 ms).
@@ -290,8 +286,8 @@ function drawTimeline(canvas, state, now) {
   ctx.fillStyle = '#283270';
   ctx.fillRect(0, ZOOM_Y - 14, w, 2);
   ctx.fillStyle = '#7d86c4';
-  ctx.fillText('zoom', 6, ZOOM_Y + 18);
-  ctx.fillText('120 ms', 6, ZOOM_Y + 44);
+  ctx.fillText('zoom', 6, ZOOM_Y + 16);
+  ctx.fillText('120ms', 6, ZOOM_Y + 46);
   forEachSlice(state, now, (task, s0, s1) => {
     if (s1 < now - ZOOM_MS) return;
     const x0 = Math.max(labelW, zx(s0));
@@ -315,7 +311,7 @@ function drawTimeline(canvas, state, now) {
   ctx.fillStyle = '#ffffff';
   for (let i = f.length - 1; i >= 0 && f[i] >= now - ZOOM_MS; i--) ctx.fillRect(zx(f[i]) - 1, ZOOM_Y + 60, 3, 22);
   ctx.fillStyle = '#7d86c4';
-  ctx.fillText('▲ frame', w - 96, ZOOM_Y + 92);
+  ctx.fillText('▲ = frame', w - 150, ZOOM_Y + 104);
 }
 
 function forEachSlice(state, now, fn) {
@@ -328,23 +324,12 @@ function forEachSlice(state, now, fn) {
 
 function writeStats(els, state, now) {
   const f = state.frames;
-  const recent = f.filter((t) => t > now - 1000);
-  const fps = recent.length;
+  const fps = f.filter((t) => t > now - 1000).length;
   let worst = 0;
   for (let i = 1; i < f.length; i++) worst = Math.max(worst, f[i] - f[i - 1]);
-  let slicesRecent = 0;
-  for (const task of state.tasks.values()) {
-    if (task.kind !== 'render') continue;
-    for (const s of task.slices) if (s.start > now - WINDOW_MS) slicesRecent++;
-  }
-  const lastDone = [...state.attempts].reverse().find((a) => a.status === 'committed');
   set(els.fps, String(fps));
   if (els.fps) els.fps.dataset.level = fps >= 50 ? 'good' : fps >= 30 ? 'warn' : 'bad';
   set(els.worst, `${Math.round(worst)} ms`);
-  set(els.slices, String(slicesRecent));
-  set(els.committed, String(state.committed));
-  set(els.discarded, String(state.discarded));
-  set(els.lastRender, lastDone ? `${Math.round(lastDone.end - lastDone.start)} ms${lastDone.sync ? ' (sync)' : ' (sliced, wall time)'}` : '–');
 }
 
 function set(el, text) {

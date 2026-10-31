@@ -25,17 +25,22 @@ export const NAMES = Array.from({ length: CELL_COUNT }, () => {
   return s;
 });
 
-// 0 = background, 1 = body, 2 = eye
-function shapeAt(x, y) {
+// Heads, in grid cells. The Hydra faces left, toward Fiber-kun.
+export const HEADS = [
+  [24, 16],
+  [62, 9],
+  [100, 16],
+];
+
+// 0 = background, 1 = body, 2 = eye, 5 = mouth, 6 = tooth
+function baseShape(x, y) {
   const inEllipse = (cx, cy, rx, ry) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1;
-  const heads = [
-    [24, 16],
-    [62, 9],
-    [100, 16],
-  ];
-  for (const [hx, hy] of heads) {
-    if (Math.abs(x - (hx + 3)) <= 1 && y === hy - 1) return 2;
-    if (inEllipse(hx, hy, 9, 6.5)) return 1;
+  for (const [hx, hy] of HEADS) {
+    if (inEllipse(hx, hy, 9, 6.5)) {
+      if ((x === hx - 4 || x === hx - 3) && (y === hy - 2 || y === hy - 1)) return 2;
+      if (y >= hy + 2 && y <= hy + 3 && x >= hx - 8 && x <= hx - 1) return y === hy + 2 && x % 2 === 0 ? 6 : 5;
+      return 1;
+    }
     // Neck: a thick line from the head down to the body.
     const bx = 62 + (hx - 62) * 0.35;
     const by = 50;
@@ -45,13 +50,24 @@ function shapeAt(x, y) {
     if ((x - px) ** 2 + (y - py) ** 2 <= 16) return 1;
   }
   if (inEllipse(62, 60, 36, 15)) return 1;
-  if (y >= 70 && y <= 77 && (Math.abs(x - 40) <= 3 || Math.abs(x - 84) <= 3)) return 1; // legs
+  if (y >= 70 && y <= 79 && (Math.abs(x - 40) <= 3 || Math.abs(x - 84) <= 3)) return 1; // legs
   if (inEllipse(105, 66, 16, 3.5) && x > 92) return 1; // tail
   return 0;
 }
 
-export const SHAPE = Array.from({ length: CELL_COUNT }, (_, i) => shapeAt(i % COLS, Math.floor(i / COLS)));
-export const BASE_CLASS = SHAPE.map((s) => (s === 0 ? 'c0' : s === 1 ? 'c1' : 'c2'));
+const RAW = Array.from({ length: CELL_COUNT }, (_, i) => baseShape(i % COLS, Math.floor(i / COLS)));
+const at = (x, y) => (x < 0 || y < 0 || x >= COLS || y >= ROWS ? 0 : RAW[y * COLS + x]);
+
+// Add shading: 4 = highlight (open sky above), 3 = shade (open air below).
+export const SHAPE = RAW.map((v, i) => {
+  if (v !== 1) return v;
+  const x = i % COLS;
+  const y = Math.floor(i / COLS);
+  if (at(x, y - 1) === 0) return 4;
+  if (at(x, y + 1) === 0 || at(x, y + 2) === 0) return 3;
+  return 1;
+});
+export const BASE_CLASS = SHAPE.map((s) => `c${s}`);
 export const HIT_CLASS = SHAPE.map((s) => (s === 0 ? 'h0' : 'h1'));
 
 export function countHits(q) {

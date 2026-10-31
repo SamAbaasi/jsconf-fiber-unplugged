@@ -51,13 +51,14 @@ export function AnimatedSprite({ frames, fps = 3, paused = false, ...rest }) {
   return <Sprite frame={frames[i % frames.length]} {...rest} />;
 }
 
-// Pre-renders a frame to a canvas once, for fast drawing in canvas scenes.
-const canvasCache = new Map();
+// Pre-renders a frame to a canvas once per (frame, palette, scale), for fast drawing in canvas scenes.
+const canvasCache = new WeakMap(); // frame → palette → scale → canvas
 export function spriteCanvas(frame, palette, scale) {
-  const key = frame;
-  let perScale = canvasCache.get(key);
-  if (!perScale) canvasCache.set(key, (perScale = new Map()));
-  let c = perScale.get(scale);
+  let byPalette = canvasCache.get(frame);
+  if (!byPalette) canvasCache.set(frame, (byPalette = new WeakMap()));
+  let byScale = byPalette.get(palette);
+  if (!byScale) byPalette.set(palette, (byScale = new Map()));
+  let c = byScale.get(scale);
   if (c) return c;
   c = document.createElement('canvas');
   c.width = frame[0].length * scale;
@@ -71,7 +72,7 @@ export function spriteCanvas(frame, palette, scale) {
       ctx.fillRect(x * scale, y * scale, scale, scale);
     }
   });
-  perScale.set(scale, c);
+  byScale.set(scale, c);
   return c;
 }
 
