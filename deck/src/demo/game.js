@@ -41,10 +41,13 @@ export const RULES = {
 export function rankOf({ bites, keys, worstKey, fallen }) {
   if (fallen) return 'C';
   if (bites === 0) return 'S';
-  if (bites / Math.max(1, keys) <= 0.1 && worstKey <= 100) return 'A';
+  // A: at most 1 bite or 10% of the keys (whichever is larger), worst key ≤ 100 ms. The "1 bite"
+  // part was added after the 2× test: in a short round (Enter after 5–7 keys) one key at 51 ms
+  // was already more than 10%.
+  if (bites <= Math.max(1, Math.floor(keys * 0.1)) && worstKey <= 100) return 'A';
   return 'B';
 }
-export const RANK_RULE = 'S: 0 bites · A: ≤ 10% of keys bite and worst key ≤ 100 ms · B: fewer than 50% bite · C: ≥ 50% bite (after 3 keys) = QUEST FAILED';
+export const RANK_RULE = 'S: 0 bites · A: at most 1 bite (or 10% of keys, if more) and worst key ≤ 100 ms · B: fewer than 50% bite · C: ≥ 50% bite (after 3 keys) = QUEST FAILED';
 
 // Same boss, same workload, three looks.
 export const FORMS = [
@@ -212,6 +215,7 @@ function freshRound() {
     finishAt: 0,
     finalScheduled: false,
     fallAt: 0, // when the dragon started to fall
+    breath: null, // { t0, ms }: the last long frame
     inputDelays: [],
     result: null,
     resultAt: 0,
@@ -496,6 +500,10 @@ export function createGame(els) {
         g.worst = Math.max(g.worst, dt);
         g.frames++;
         g.frameTimes.push(now);
+        // Dragon fire = a real long frame (≥ 50 ms, L1): the heavy render blocked the main thread.
+        // Drawn right after the freeze, with the measured gap. Sliced rounds have no long frames,
+        // so the dragon cannot breathe fire there. Visual only: bites decide the result.
+        if (dt >= RULES.jankMs) g.breath = { t0: now, ms: Math.round(dt) };
       }
 
       // Goblins: resolve the ones whose text was committed before this frame.
@@ -650,6 +658,7 @@ export function createGame(els) {
         ctx.fillText('HA! HA!', HEAD[0] + 40, HEAD[1] - 70 - Math.abs(Math.sin(now / 160)) * 16);
       }
 
+      if (g.breath && !g.fallAt && now - g.breath.t0 < 600) drawBreath(ctx, now, g.breath);
       drawVillage(ctx, now);
       drawGoblins(ctx, now);
       drawVillageFire(ctx, now);
@@ -904,6 +913,33 @@ export function createGame(els) {
       ctx.restore();
     }
     drawSword(ctx, front, handY, angle, { scale: SWORD, flip: facingLeft });
+  }
+
+  // ---------- dragon fire (one real long frame) ----------
+  function drawBreath(ctx, now, b) {
+    const age = (now - b.t0) / 600;
+    const mx = DRAGON_BOX.x + 3 * DESIGN_PX; // the mouth
+    const my = DRAGON_BOX.y + 24 * DESIGN_PX;
+    const len = 320; // full length at once: the freeze already happened
+    for (let d = 0; d < len; d += PX) {
+      const spread = 6 + d * 0.35;
+      const cx = mx - d;
+      const cy = my + d * 0.55;
+      for (let k = -spread; k <= spread; k += PX) {
+        const flick = Math.floor(now / 60 + d / PX + k / PX) % 4;
+        if (flick === 3 && Math.abs(k) > spread * 0.6) continue;
+        ctx.globalAlpha = (1 - age * age) * (1 - d / 480);
+        ctx.fillStyle = Math.abs(k) < spread * 0.35 ? '#fff3b0' : flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
+        ctx.fillRect(Math.round((cx - PX / 2) / PX) * PX, Math.round((cy + k) / PX) * PX, PX, PX);
+      }
+    }
+    ctx.globalAlpha = 1 - age;
+    ctx.font = '40px DotGothic16';
+    ctx.fillStyle = '#05071a';
+    ctx.fillText(`${b.ms} ms frozen`, mx + 150 + 3, my - 160 + 3);
+    ctx.fillStyle = '#ff9f1c';
+    ctx.fillText(`${b.ms} ms frozen`, mx + 150, my - 160);
+    ctx.globalAlpha = 1;
   }
 
   // ---------- end-of-round scene, readable without text or sound ----------
