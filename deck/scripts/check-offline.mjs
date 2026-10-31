@@ -1,12 +1,15 @@
 // Opens dist/index.html from file:// in Chromium with the network blocked, then:
-//  - walks every slide and step and saves a screenshot of each state
-//  - runs the boss-fight demo in all three modes (auto-typing) and reads the live numbers
+//  - walks every slide and step, waits for animations/typewriters, saves a screenshot of each state
+//  - audits visible text: font size (stage px) and word count per state
+//  - checks that a click while a dialogue line is typing finishes the line (and does not advance)
+//  - plays the three boss rounds with auto-type and reads each result screen (real numbers)
 //  - opens the presenter window and checks that it controls the deck
-// Fails if any request leaves file:/data:/blob:, or if the page logs an error.
+// Fails if any request leaves file:/data:/blob:, or if any page logs an error or warning.
 //
-// Usage: npm run build && npm run check [-- --out <dir>] [-- --headed]
+// Usage: npm run build && npm run check [-- --out <dir>] [-- --headed] [-- --record]
+//   --record   also records the three boss rounds to <out>/boss-rounds.webm (separate run)
 import { createRequire } from 'node:module';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readdirSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -18,18 +21,23 @@ const args = process.argv.slice(2);
 const outDir = path.resolve(args.includes('--out') ? args[args.indexOf('--out') + 1] : path.join(root, '.check'));
 mkdirSync(outDir, { recursive: true });
 const url = pathToFileURL(path.join(root, 'dist', 'index.html')).href;
+const MIN_PX = 28;
 
 const problems = [];
 const blocked = [];
 
 const browser = await chromium.launch({ headless: !args.includes('--headed') });
-const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
-await context.route('**/*', (route) => {
-  const u = route.request().url();
-  if (u.startsWith('file:') || u.startsWith('data:') || u.startsWith('blob:')) return route.continue();
-  blocked.push(u);
-  return route.abort();
-});
+
+async function newContext(extra = {}) {
+  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, ...extra });
+  await context.route('**/*', (route) => {
+    const u = route.request().url();
+    if (u.startsWith('file:') || u.startsWith('data:') || u.startsWith('blob:')) return route.continue();
+    blocked.push(u);
+    return route.abort();
+  });
+  return context;
+}
 
 function watch(page, name) {
   page.on('console', (m) => {
@@ -38,86 +46,175 @@ function watch(page, name) {
   page.on('pageerror', (e) => problems.push(`${name} pageerror: ${e.message}`));
 }
 
-const page = await context.newPage();
-watch(page, 'audience');
-await page.goto(url);
-await page.evaluate(() => document.fonts.ready);
+const hashOf = (page) => page.evaluate(() => location.hash);
 
-const hash = () => page.evaluate(() => location.hash);
-const report = { url, slides: [], demo: {}, presenter: {} };
-
-// Walk all states until the hash stops changing.
-let last = '';
-for (let i = 0; i < 200; i++) {
-  const h = await hash();
-  if (h === last) break;
-  last = h;
-  const [, slide, step] = h.split('/');
-  const isBoss = await page.locator('.boss').count();
-  const isWalk = await page.locator('.yield-walk').count();
-  await page.waitForTimeout(isWalk ? 6200 : isBoss ? 1500 : 700);
-  await page.screenshot({ path: path.join(outDir, `slide-${slide.padStart(2, '0')}-step-${step}.png`) });
-  report.slides.push(h);
-
-  if (isBoss) {
-    const mode = await page.locator('.boss-mode.is-on').innerText();
-    await page.keyboard.press('c');
-    await page.waitForTimeout(1200);
-    const before = await page.evaluate(() => ({
-      committed: Number(document.querySelector('.boss-stats b:nth-of-type(1)')?.textContent ?? 0),
-    }));
-    await page.keyboard.press('a');
-    await page.waitForTimeout(2400);
-    const stats = await page.evaluate(() => {
-      const t = (sel) => document.querySelector(sel)?.textContent;
-      const bs = [...document.querySelectorAll('.boss-stats b')].map((b) => b.textContent);
-      const log = globalThis.__fiberEventLog;
-      const events = [];
-      for (let i = Math.max(0, log.n - log.size); i < log.n; i++) events.push(log.buf[i % log.size]);
-      const recent = events.filter((e) => e.t > performance.now() - 3000);
-      const counts = {};
-      for (const e of recent) counts[e.type] = (counts[e.type] || 0) + 1;
-      return {
-        fps: t('.boss-fps-num'),
-        worstFrame: t('.boss-fps-worst b'),
-        committed: bs[0],
-        thrownAway: bs[1],
-        slices3s: bs[2],
-        lastRender: bs[3],
-        input: document.querySelector('#boss-search')?.value,
-        eventCounts3s: counts,
-      };
-    });
-    await page.screenshot({ path: path.join(outDir, `slide-${slide.padStart(2, '0')}-step-${step}-typing.png`) });
-    report.demo[mode] = { ...stats, committedBefore: before.committed };
-    await page.keyboard.press('c');
-    await page.waitForTimeout(800);
-  }
-  await page.keyboard.press('PageDown');
+// Visible text inside the stage: font size in stage px, and a word count.
+function auditText(page) {
+  return page.evaluate((min) => {
+    const stage = document.querySelector('.stage');
+    const sr = stage.getBoundingClientRect();
+    const scale = sr.width / 1920;
+    const small = [];
+    let words = 0;
+    const walker = document.createTreeWalker(stage, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const text = node.textContent.trim();
+      if (!text) continue;
+      const el = node.parentElement;
+      if (!el || el.closest('.dlg-ghost')) continue;
+      if (el.checkVisibility && !el.checkVisibility({ visibilityProperty: true, opacityProperty: true })) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const r = range.getBoundingClientRect();
+      if (!r.width || !r.height || r.right < sr.left || r.left > sr.right || r.bottom < sr.top || r.top > sr.bottom) continue;
+      let size = parseFloat(getComputedStyle(el).fontSize);
+      const svg = el.closest('svg');
+      if (svg && svg.viewBox.baseVal && svg.viewBox.baseVal.width) {
+        size *= svg.getBoundingClientRect().width / scale / svg.viewBox.baseVal.width;
+      }
+      words += text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+      if (size < min - 0.5) {
+        const cls = typeof el.className === 'string' ? el.className : el.className?.baseVal;
+        small.push({ px: Math.round(size * 10) / 10, text: text.slice(0, 40), cls });
+      }
+    }
+    return { small, words };
+  }, MIN_PX);
 }
 
-// Presenter window: open it, check the link, drive the deck from it.
-await page.keyboard.press('Home');
-await page.waitForTimeout(300);
-const [presenter] = await Promise.all([context.waitForEvent('page'), page.keyboard.press('p')]);
-watch(presenter, 'presenter');
-await presenter.waitForLoadState('load');
-await presenter.waitForTimeout(800);
-report.presenter.linked = await presenter.locator('.p-link').innerText();
-await presenter.keyboard.press('PageDown');
-await presenter.keyboard.press('PageDown');
-await presenter.waitForTimeout(500);
-report.presenter.audienceHashAfterTwoClicks = await hash();
-report.presenter.presenterPos = await presenter.locator('.p-pos').innerText();
-await presenter.screenshot({ path: path.join(outDir, 'presenter.png') });
+async function waitForState(page) {
+  if (await page.locator('.yw').count()) return page.waitForTimeout(9500); // Yield walk animation
+  if (await page.locator('.truck-slide').count()) {
+    const h = await hashOf(page);
+    if (h.endsWith('/1')) await page.locator('.truck-frozen').waitFor({ timeout: 8000 });
+  }
+  if (await page.locator('.dlg').count()) {
+    await page.locator('.dlg-more').first().waitFor({ timeout: 6000 }).catch(() => {});
+  }
+  return page.waitForTimeout(700);
+}
+
+async function playRound(page, label, shot = null) {
+  await page.keyboard.press('r');
+  await page.waitForTimeout(600);
+  await page.keyboard.press('a');
+  if (shot) {
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: shot });
+  }
+  await page.locator('.boss-overlay.is-result').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(400);
+  const result = JSON.parse(await page.locator('.boss-overlay').getAttribute('data-result'));
+  const fps = await page.locator('.boss-fps-num').innerText();
+  return { label, ...result, fpsAfter: fps };
+}
+
+const report = { url, states: [], fontAudit: [], wordsOver40: [], dialogueClick: null, rounds: [], presenter: {}, truckFrozenMs: null };
+
+// ---------- main run ----------
+{
+  const context = await newContext();
+  const page = await context.newPage();
+  watch(page, 'audience');
+  await page.goto(url);
+  await page.evaluate(() => document.fonts.ready);
+
+  // Dialogue: a click while typing finishes the line and stays on the same step.
+  await page.keyboard.press('PageDown'); // cold open, step 1: the line starts typing
+  await page.waitForTimeout(120);
+  const before = await page.locator('.dlg-ghost').textContent();
+  await page.keyboard.press('PageDown');
+  await page.waitForTimeout(80);
+  report.dialogueClick = {
+    ghostBeforeClick: before.length,
+    hashAfterClick: await hashOf(page),
+    ghostAfterClick: (await page.locator('.dlg-ghost').textContent()).length,
+  };
+  report.dialogueClick.ok = report.dialogueClick.hashAfterClick === '#/1/1' && report.dialogueClick.ghostBeforeClick > 0 && report.dialogueClick.ghostAfterClick === 0;
+  if (!report.dialogueClick.ok) problems.push(`dialogue click test failed: ${JSON.stringify(report.dialogueClick)}`);
+  await page.keyboard.press('Home');
+  await page.waitForTimeout(300);
+
+  let last = '';
+  for (let i = 0; i < 300; i++) {
+    const h = await hashOf(page);
+    if (h === last) break;
+    last = h;
+    const [, slide, step] = h.split('/');
+    await waitForState(page);
+    const name = `slide-${slide.padStart(2, '0')}-step-${step}`;
+    await page.screenshot({ path: path.join(outDir, `${name}.png`) });
+    const isBoss = (await page.locator('.boss').count()) > 0;
+    const audit = await auditText(page);
+    report.states.push(h);
+    if (audit.small.length) report.fontAudit.push({ state: h, boss: isBoss, small: audit.small });
+    if (!isBoss && audit.words > 40) report.wordsOver40.push({ state: h, words: audit.words });
+    if (await page.locator('.truck-frozen b').count()) report.truckFrozenMs = await page.locator('.truck-frozen b').innerText();
+
+    if (isBoss) {
+      const mode = (await page.locator('.boss-mode.is-on').innerText()).trim();
+      const r = await playRound(page, mode, path.join(outDir, `${name}-fight.png`));
+      report.rounds.push(r);
+      await page.screenshot({ path: path.join(outDir, `${name}-result.png`) });
+      await page.keyboard.press('c');
+      await page.waitForTimeout(600);
+    }
+    await page.keyboard.press('PageDown');
+  }
+
+  // Presenter window: open it, check the link, drive the deck from it.
+  await page.keyboard.press('Home');
+  await page.waitForTimeout(300);
+  const [presenter] = await Promise.all([context.waitForEvent('page'), page.keyboard.press('p')]);
+  watch(presenter, 'presenter');
+  await presenter.waitForLoadState('load');
+  await presenter.waitForTimeout(800);
+  report.presenter.linked = await presenter.locator('.p-link').innerText();
+  await presenter.keyboard.press('PageDown');
+  await presenter.waitForTimeout(1500);
+  await presenter.keyboard.press('PageDown');
+  await presenter.waitForTimeout(500);
+  report.presenter.audienceHashAfterTwoClicks = await hashOf(page);
+  report.presenter.presenterPos = await presenter.locator('.p-pos').innerText();
+  report.presenter.notesNow = await presenter.locator('.p-notes .is-now').first().innerText().catch(() => '');
+  await presenter.screenshot({ path: path.join(outDir, 'presenter.png') });
+  await context.close();
+}
+
+// ---------- optional: record the three boss rounds ----------
+if (args.includes('--record')) {
+  const videoDir = path.join(outDir, 'video-tmp');
+  mkdirSync(videoDir, { recursive: true });
+  const context = await newContext({ recordVideo: { dir: videoDir, size: { width: 1280, height: 720 } } });
+  const page = await context.newPage();
+  watch(page, 'record');
+  const bossIndex = 6; // 1-based slide number of the boss fight
+  await page.goto(`${url}#/${bossIndex}/0`);
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(1500);
+  report.recordedRounds = [];
+  for (let step = 0; step < 3; step++) {
+    if (step > 0) {
+      await page.keyboard.press('PageDown');
+      await page.waitForTimeout(1500);
+    }
+    report.recordedRounds.push(await playRound(page, `round ${step + 1} (while recording)`));
+    await page.waitForTimeout(2500);
+  }
+  await context.close();
+  const file = readdirSync(videoDir).find((f) => f.endsWith('.webm'));
+  if (file) renameSync(path.join(videoDir, file), path.join(outDir, 'boss-rounds.webm'));
+}
 
 report.blockedRequests = blocked;
 report.problems = problems;
 writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2));
-console.log(JSON.stringify(report, null, 2));
 await browser.close();
+
+console.log(JSON.stringify({ ...report, states: report.states.length }, null, 2));
 if (blocked.length || problems.length) {
   console.error(`\nFAILED: ${blocked.length} blocked request(s), ${problems.length} problem(s)`);
   process.exit(1);
 }
-console.log(`\nOK: ${report.slides.length} states, no network, no errors. Screenshots in ${outDir}`);
+console.log(`\nOK: ${report.states.length} states, no network, no errors. Output in ${outDir}`);

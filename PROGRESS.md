@@ -47,3 +47,31 @@
 - The ~30 ms worst frame in transition modes is likely the commit (commits never yield) repainting thousands of cells, in a container with no GPU. It needs measuring on the stage laptop. If it is too high there, I can reduce the DOM cost (for example, draw the grid on a canvas from a layout effect).
 - The headless numbers are not stage numbers. `[` / `]` adjust the work per cell on stage.
 - Not built yet (Phase 3): the other ~38 slides, SCRIPT.md, the PDF and MP4 fallback, RUNBOOK.md.
+
+## Phase 2.5: make it fun (2026-10-31)
+
+**Changed**
+- **Dialogue box**: pixel frame, Fiber-kun portrait with 4 faces (normal / shocked / smug / sleeping), typewriter text. A click while typing finishes the line. Used for the cold open, the truck, and as the Yield narrator.
+- **Cold open** (2 slides before the title): black → 「目が覚めたら…」 → truck scene. The truck's impact runs a **real** `flushSync` render of 5,000 components. "FROZEN FRAME N ms" and the truck label show the measured frame gap (150–217 ms in my runs) → *(Saman)* "Wait… I'm a plain JavaScript object?"
+- **STATUS**: full-screen window, 7 fields at 44 px, then SKILLS: 《Yield》 外れスキル? "Effect: stop working." → tooltip "Only for: Transition · Retry · Idle" (A4) → sealed 封印 《Yield · 25 ms》 `enableThrottledScheduling = false` (A3).
+- **Yield**: full-screen skill card → code at 48 px → bigger tree walk, narrated in the dialogue box (the narration names the real `workInProgress` fiber) → full-screen "YIELD = PAUSE".
+- **Boss fight is a real fight**: JANK HYDRA (the 10,000 real cell fibers, now shaded, with eyes and teeth), HP bars, fireballs every 300 ms, hits resolved by **real frame length**, "-169ms JANK!" + shake, DODGE, RESPAWN AT ROOT on real thrown-away renders, a result screen and rank from fixed rules. All of this runs in the rAF monitor loop, outside React.
+- **Patch notes** slide: the four on-stage corrections, as a game patch note.
+- **Sound**: 8-bit SFX synthesized with WebAudio (blip, unlock, hit, dodge, respawn, rank, lose). **M** toggles it; off by default; shown in the corner and in the presenter view.
+- **Text size**: every visible text is ≥ 28 px (code ≥ 32 px), except the boss timeline legend (24 px, allowed). Every slide except the boss is ≤ 40 words.
+- New: `JOKES.md`, `JP_REVIEW.md`, `deck/src/content/lines.js` (all lines, marked saman/draft), `deck/scripts/check-claims.mjs`.
+
+**Measured** (headless Chromium, cloud container, no GPU, production build, auto-type: 13 keystrokes). Two runs:
+
+| Round | Result | Avg FPS in round | Worst frame | Hits (damage) | Thrown away | 5 ms slices | Rank |
+|---|---|---|---|---|---|---|---|
+| 1 · no transition | K.O. / K.O. | 16 / 11 | 143 / 202 ms | 4 (547) / 3 (523) | 0 / 0 | 1 / 1 | C / B |
+| 2 · useTransition | WIN / WIN | 60 / 60 | 32 / 31 ms | 0 / 0 | 9 / 9 | 215 / 213 | S / S |
+| 3 · useDeferredValue | WIN / WIN | 60 / 60 | 29 / 33 ms | 0 / 0 | 9 / 9 | 214 / 216 | S / S |
+
+**Difference vs. Phase 2:**
+- Worst frames are in the same range as before (sync 134–188 → 143–202 ms; transition 32–34 → 31–39 ms; deferred 27–36 → 25–33 ms). I can't see a cost from the game layer in these numbers, but the run-to-run noise is about ±10 ms.
+- The Phase 2 "thrown away 17–18" for round 3 was **cumulative** (it included round 2's 9). Per round, it is 9.
+- While the screen recorder runs, rounds 2–3 get slower (worst frame 45–62 ms, rank A, once TIME UP with 1 hit). The game showed that truthfully.
+
+**Claims**: none added or dropped. Three IDs in the brief did not match CLAIMS.md: VIP pass = **C2** (not C5), Header = **H3** (not H2), the 4th correction = **C10**/A4 (not B3). I used the correct IDs.

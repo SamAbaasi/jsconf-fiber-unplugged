@@ -8,8 +8,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173 --strictPort",
-    "check": "node scripts/check-offline.mjs",
-    "fonts": "node scripts/gen-fonts.mjs"
+    "check": "node scripts/check-claims.mjs && node scripts/check-offline.mjs",
+    "fonts": "node scripts/gen-fonts.mjs",
+    "check:claims": "node scripts/check-claims.mjs"
   },
   "dependencies": {
     "@fontsource/dotgothic16": "5.3.1",

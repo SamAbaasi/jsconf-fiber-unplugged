@@ -28,11 +28,39 @@ npm run preview      # http://localhost:4173
 | B or . | black screen |
 | F | fullscreen |
 | P | open the presenter window (current + next slide, notes, timer) |
+| M | sound on/off (8-bit SFX made with WebAudio; **off by default**) |
 
 The presenter window controls the deck too. In it, **T** starts/pauses the timer and **R** resets it.
 PageUp/PageDown (clicker) always work, even while the demo input has focus. **Esc** leaves the input.
 
-Boss-fight slide (live demo): **I** focus the input · **A** auto-type · **C** clear · **[ ]** less/more work per cell.
+A click while a dialogue line is still typing finishes the line (it does not move on).
+
+Boss-fight slide (live demo): **I** focus the input · **A** auto-type · **C** clear · **R** restart the round · **[ ]** less/more work per cell.
+
+## Slides so far (Phase 2.5)
+
+1. Cold open: black screen, 「目が覚めたら…」
+2. Truck-kun, **live**: the truck's impact runs a real `flushSync` render; the frozen frame is measured
+3. Title
+4. STATUS window: fields, twin, lanes, SKILLS (外れスキル?, 封印)
+5. Skill: Yield: skill card → loop code → tree walk narrated in a dialogue box → summary
+6. Boss fight, **live**: JANK HYDRA, three rounds (sync / useTransition / useDeferredValue)
+7. Patch notes: the four corrections to my articles
+
+On-screen lines live in `src/content/lines.js`, each marked `by: 'saman'` or `by: 'draft'`.
+
+## The boss-fight game rules
+
+Fixed in `src/demo/game.js` (`RULES`, `rankOf`) and shown on screen before every round:
+
+- A round lasts 3 s from the first keystroke. The Hydra attacks every 300 ms (wall clock).
+- An attack is resolved in the animation frame that contains its time. If that frame is **longer than 50 ms**, Fiber-kun is hit for the frame's real length in ms. Otherwise he dodges.
+- Every frame that is not longer than 50 ms deals 1 damage to the Hydra (HP 120). Fiber-kun has HP 500.
+- K.O. at HP 0, WIN when the Hydra reaches 0, otherwise TIME UP.
+- Rank: **S** 0 hits and worst frame ≤ 50 ms · **A** ≤ 1 hit and worst ≤ 100 ms · **B** ≤ 3 hits · **C** more.
+- "RESPAWN AT ROOT" and the RESPAWN counter appear only for a real thrown-away render (the list started a new render attempt before its last one committed).
+
+No randomness anywhere. All game effects run in the monitor's `requestAnimationFrame` loop, outside React.
 
 ## How the live demo is measured
 
@@ -53,7 +81,14 @@ Boss-fight slide (live demo): **I** focus the input · **A** auto-type · **C** 
 npm run build && npm run check
 ```
 
-This opens `dist/index.html` from `file://` in headless Chromium with **all network requests blocked**,
-walks every slide and step, runs the demo in all three modes, tests the presenter link, and fails on
-any request or console error. Screenshots and numbers go to `.check/`. The built page also carries a
-Content-Security-Policy with `connect-src 'none'`.
+`npm run check` runs two scripts:
+
+- `scripts/check-claims.mjs`: every claim ID used in the deck and in `JOKES.md` exists in `CLAIMS.md`;
+  every on-screen line has an author; every Japanese string is listed in `JP_REVIEW.md`.
+- `scripts/check-offline.mjs`: opens `dist/index.html` from `file://` in headless Chromium with **all network
+  requests blocked**, walks every slide and step, audits font sizes (< 28 px) and words (> 40 outside the boss
+  slide), tests that a click finishes a typing line, plays the three boss rounds and reads the result screens,
+  and tests the presenter link. It fails on any request or console error. Add `-- --record` to also record the
+  three rounds to `.check/boss-rounds.webm`. Output goes to `.check/`.
+
+The built page also carries a Content-Security-Policy with `connect-src 'none'`.
