@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, useTransition, useDeferredValue } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition, useDeferredValue } from 'react';
 import { DragonList, TextProbe } from '../demo/DragonList.jsx';
 import { calibrate, settings, setMicrosPerCell } from '../demo/work.js';
 import { startMonitor } from '../demo/monitor.js';
-import { createGame, ARENA } from '../demo/game.js';
-import { CELL_COUNT, countHits } from '../demo/dragon.js';
+import { createGame, ARENA, DRAGON_BOX } from '../demo/game.js';
+import { makeDragon, CELL_LEVELS, DEFAULT_CELLS } from '../demo/dragon.js';
+import { startPhaseObserver } from '../demo/phases.js';
 import { runCalibration, showChecklist } from '../demo/calibration.js';
 import { record } from '../instrument/eventLog.js';
 import { isTyping } from '../engine/keys.js';
@@ -52,6 +53,12 @@ function initialWork() {
   return settings.microsPerCell;
 }
 
+// Number of cells (DOM size): from ?cells=N if given (set by the calibration), else 10,000.
+function initialCells() {
+  const fromUrl = Number(new URLSearchParams(location.search).get('cells'));
+  return CELL_LEVELS.includes(fromUrl) ? fromUrl : DEFAULT_CELLS;
+}
+
 function typeInto(input, value) {
   // Same path as a real keystroke: a native "input" event, which React treats
   // as a discrete event (SyncLane, D2).
@@ -72,6 +79,9 @@ export function BossFight({ step }) {
   const [modeOverride, setModeOverride] = useState(null);
   const mode = MODES[modeOverride ?? Math.min(step, MODES.length - 1)];
   const [micros, setMicros] = useState(initialWork);
+  const [cells, setCells] = useState(initialCells);
+  const dragon = useMemo(() => makeDragon(cells), [cells]);
+  const dragonScale = DRAGON_BOX.w / (dragon.cols * 4);
   const [text, setText] = useState({ v: '', seq: 0 });
   const [query, setQuery] = useState({ v: '', seq: 0 });
   const [isPending, startTransition] = useTransition();
@@ -87,8 +97,11 @@ export function BossFight({ step }) {
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const calibRef = useRef(null);
+  const cellsRef = useRef(cells);
+  cellsRef.current = cells;
 
   useEffect(() => {
+    startPhaseObserver();
     const els = Object.fromEntries(names.map((n) => [n, refs[n].current]));
     els.resultLine = (r) => resultLine(r, modeRef.current.key);
     const game = createGame(els);
@@ -97,6 +110,10 @@ export function BossFight({ step }) {
     return stop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    gameRef.current?.setCells(cells);
+  }, [cells]);
 
   // New round whenever the mode changes; coming back from deferred mode, sync the list query.
   useEffect(() => {
@@ -162,7 +179,7 @@ export function BossFight({ step }) {
       if (c?.running) return c.cancel();
       if (!c?.armed) {
         calibRef.current = { armed: true };
-        showChecklist(refs.calib.current, settings.microsPerCell);
+        showChecklist(refs.calib.current, settings.microsPerCell, cellsRef.current);
         return;
       }
       calibRef.current = runCalibration({
@@ -175,6 +192,8 @@ export function BossFight({ step }) {
           setMicrosPerCell(us);
           setMicros(settings.microsPerCell);
         },
+        getCells: () => cellsRef.current,
+        setCells: (n) => setCells(n),
         modes: MODES,
         onDone: () => setModeOverride(null),
       });
@@ -225,7 +244,7 @@ export function BossFight({ step }) {
   return (
     <div className={`boss mode-${mode.key}`}>
       <header className="boss-top">
-        <div className="boss-title">BOSS FIGHT</div>
+        <div className="boss-title">BOSS ROOM</div>
         <div className="boss-modes">
           {MODES.map((m, i) => (
             <div key={m.key} className={`boss-mode rank-${m.rank} ${m.key === mode.key ? 'is-on' : ''}`}>
@@ -234,16 +253,16 @@ export function BossFight({ step }) {
           ))}
         </div>
         <div className="boss-same">
-          same work: {CELL_COUNT.toLocaleString('en-US')} fibers × {micros} µs
+          same work: {dragon.cells.toLocaleString('en-US')} fibers × {micros} µs
         </div>
       </header>
 
       <div className="boss-arena" ref={refs.arena}>
         <canvas ref={refs.world} className="boss-layer pixelated" width={ARENA.w} height={ARENA.h} />
-        <div className="boss-hydra" ref={refs.hydra}>
+        <div className="boss-hydra" ref={refs.hydra} style={{ left: DRAGON_BOX.x, top: DRAGON_BOX.y, width: DRAGON_BOX.w, height: DRAGON_BOX.h }}>
           <div className="dragon-kb" ref={refs.dragonKb}>
-            <div className={pending ? 'is-pending' : ''}>
-              <DragonList query={listQuery.v} seq={listQuery.seq} />
+            <div className={`dragon-scale ${pending ? 'is-pending' : ''}`} style={{ transform: `scale(${dragonScale})` }}>
+              <DragonList dragon={dragon} query={listQuery.v} seq={listQuery.seq} />
             </div>
           </div>
         </div>
@@ -285,7 +304,7 @@ export function BossFight({ step }) {
         />
         <TextProbe seq={text.seq} />
         <div className="boss-hits">
-          hits <b>{countHits(listQuery.v)}</b>
+          hits <b>{dragon.countHits(listQuery.v)}</b>
         </div>
         <div className={`boss-pending ${pending ? 'is-on' : ''}`}>{pending ? 'pending…' : ''}</div>
       </div>

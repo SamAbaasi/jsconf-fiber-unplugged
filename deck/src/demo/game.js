@@ -3,35 +3,38 @@
 //            input event happens and is resolved on the first animation frame after the
 //            commit that puts that keystroke's text in the DOM. Latency = that frame's time
 //            − event.timeStamp. Latency > 50 ms → it bites for the latency in ms.
-//   DRAGON = the heavy list of 10,000 fibers (setQuery / deferred query). Its HP = the
+//   DRAGON = the heavy list, one fiber per cell (setQuery / deferred query). Its HP = the
 //            keystrokes of this round the list has not rendered yet. Each real list commit is
 //            a slash that lands; the final commit (the one that shows the last keystroke)
 //            kills it.
+// The round's result is decided by the bites only (never by HP luck): more than
+// RULES.questFailBites bites = QUEST FAILED, even if the dragon went down.
 // Hit effects (flash, spark, number, knockback) are drawn at the point of contact.
 // All of this runs in the monitor's rAF loop, outside React.
 import { FIBER_KUN, PALETTE } from '../sprites/fiberkun.js';
 import { GOBLIN, GOBLIN_PALETTE } from '../sprites/goblin.js';
 import { drawSword } from '../sprites/sword.js';
 import { spriteCanvas } from '../ui/Sprite.jsx';
-import { NAMES, COLS, CELL_COUNT, SHAPE, DRAGON_POINTS } from './dragon.js';
+import { makeDragon, DESIGN, DRAGON_POINTS, DEFAULT_CELLS } from './dragon.js';
+import { SCALES, bbox, reportBox } from '../sprites/scale.js';
+import { analyzePhases } from './phases.js';
 import { play } from '../audio/sfx.js';
 
 export const RULES = {
   jankMs: 50, // a keystroke whose text needs longer than this to appear bites
-  fiberHp: 4000, // a bite costs its real latency in ms
+  questFailBites: 5, // more bites than this = QUEST FAILED (rank C)
   idleEndMs: 1000, // manual typing: the round ends after 1 s without a keystroke
   maxRoundMs: 20000, // safety net only
 };
 
 // Rank, decided only by real numbers. Shown on screen and in the notes.
-export function rankOf({ bites, worst, ko }) {
-  if (ko) return 'C';
+export function rankOf({ bites, worst }) {
   if (bites === 0 && worst <= 100) return 'S';
   if (bites <= 2 && worst <= 150) return 'A';
-  if (bites <= 5) return 'B';
+  if (bites <= RULES.questFailBites) return 'B';
   return 'C';
 }
-export const RANK_RULE = 'S: 0 bites, no frame > 100 ms · A: ≤ 2 bites, ≤ 150 ms · B: ≤ 5 bites · C: more or K.O.';
+export const RANK_RULE = 'S: 0 bites, no frame > 100 ms · A: ≤ 2 bites, ≤ 150 ms · B: ≤ 5 bites · C: more bites = QUEST FAILED';
 
 // Same boss, same workload, three looks.
 export const FORMS = [
@@ -40,11 +43,18 @@ export const FORMS = [
   { name: 'JANK DRAGON · SHADOW', cls: 'form-3', crown: true },
 ];
 
-export const ARENA = { w: 1150, h: 760, groundY: 690 };
-export const DRAGON_BOX = { x: 640, y: 370, cell: 4 };
-const HERO = { homeX: 342, scale: 16, size: 256, dash: 80 };
-const GOBLIN_SCALE = 7;
-const GOBLIN_SLOTS = [214, 112, 10];
+// Proportions come from the scale bible (sprites/scale.js; checked by scripts/check-scale.mjs).
+export const ARENA = { w: 1150, h: SCALES.boss.arenaH, groundY: 690 };
+const DRAGON_H = SCALES.boss.dragonH; // the dragon's drawn height
+const DESIGN_PX = DRAGON_H / DESIGN.rows; // one design-grid cell on screen
+const DRAGON_W = Math.round(DESIGN.cols * DESIGN_PX);
+export const DRAGON_BOX = { x: ARENA.w - DRAGON_W - 16, y: ARENA.groundY - DRAGON_H, w: DRAGON_W, h: DRAGON_H };
+const HERO_SCALE = SCALES.boss.hero;
+const HERO = { homeX: 270, scale: HERO_SCALE, size: 16 * HERO_SCALE, dash: 96 };
+const SWORD = 1.05; // sword scale, matched to the hero size
+const REACH = 142; // slash arc radius
+const GOBLIN_SCALE = SCALES.boss.goblin;
+const GOBLIN_SLOTS = [150, 56, -38];
 const DASH_MS = 90;
 const SLASH_MS = 80;
 const RETURN_MS = 150;
@@ -59,24 +69,30 @@ function logHit(type, t) {
   if (hitLog.length > 500) hitLog.shift();
 }
 
-const toArena = ([gx, gy]) => [DRAGON_BOX.x + gx * DRAGON_BOX.cell, DRAGON_BOX.y + gy * DRAGON_BOX.cell];
+const toArena = ([gx, gy]) => [DRAGON_BOX.x + gx * DESIGN_PX, DRAGON_BOX.y + gy * DESIGN_PX];
 const CHEST = toArena(DRAGON_POINTS.chest);
 const HEAD = toArena(DRAGON_POINTS.head);
-const cellPos = (i) => [DRAGON_BOX.x + (i % COLS) * DRAGON_BOX.cell + 2, DRAGON_BOX.y + Math.floor(i / COLS) * DRAGON_BOX.cell + 2];
+// Screen size of one grid cell of a dragon with d.cols columns.
+export const cellPx = (d) => DRAGON_W / d.cols;
+const cellPos = (d, i) => {
+  const c = cellPx(d);
+  return [DRAGON_BOX.x + ((i % d.cols) + 0.5) * c, DRAGON_BOX.y + (Math.floor(i / d.cols) + 0.5) * c];
+};
 
-// White silhouette of the dragon, for the hit flash.
-let silhouette = null;
-function dragonSilhouette() {
-  if (silhouette) return silhouette;
+// White silhouette of the dragon, for the hit flash (one per cell count).
+const silhouettes = new Map();
+function dragonSilhouette(d) {
+  if (silhouettes.has(d)) return silhouettes.get(d);
   const c = document.createElement('canvas');
-  c.width = COLS * DRAGON_BOX.cell;
-  c.height = (CELL_COUNT / COLS) * DRAGON_BOX.cell;
+  c.width = DRAGON_W;
+  c.height = DRAGON_H;
   const g = c.getContext('2d');
   g.fillStyle = '#ffffff';
-  for (let i = 0; i < CELL_COUNT; i++) {
-    if (SHAPE[i]) g.fillRect((i % COLS) * DRAGON_BOX.cell, Math.floor(i / COLS) * DRAGON_BOX.cell, DRAGON_BOX.cell, DRAGON_BOX.cell);
+  const px = cellPx(d);
+  for (let i = 0; i < d.cells; i++) {
+    if (d.shape[i]) g.fillRect(Math.floor((i % d.cols) * px), Math.floor(Math.floor(i / d.cols) * px), Math.ceil(px), Math.ceil(px));
   }
-  silhouette = c;
+  silhouettes.set(d, c);
   return c;
 }
 
@@ -90,7 +106,6 @@ function freshRound() {
     typingTotal: 0, // auto-type announces how many keystrokes it will send
     typingEndSeq: 0, // …and which one is the last
     listSeq: 0,
-    fiberHp: RULES.fiberHp,
     dragonHp: 0,
     dragonMax: 0,
     dragonHpScheduled: 0,
@@ -103,7 +118,6 @@ function freshRound() {
     frames: 0,
     thrown: 0,
     commits: 0,
-    ko: false,
     impacts: [], // dragon hits waiting for their contact frame
     sparks: [],
     floaters: [],
@@ -126,15 +140,16 @@ function freshRound() {
 }
 
 export function createGame(els) {
-  const g = { round: 0, modeTitle: '', form: FORMS[0], ...freshRound() };
+  const g = { round: 0, modeTitle: '', form: FORMS[0], dragon: makeDragon(DEFAULT_CELLS), ...freshRound() };
 
   const keysInRound = () => (g.lastKeySeq ? g.lastKeySeq - g.firstSeq + 1 : 0);
   const renderedInRound = () => (g.listSeq >= g.firstSeq && g.firstSeq ? g.listSeq - g.firstSeq + 1 : 0);
 
   function updateHud() {
-    const fk = Math.max(0, g.fiberHp);
-    setWidth(els.fkHpBar, fk / RULES.fiberHp);
-    setText(els.fkHpText, `HP ${fk} / ${RULES.fiberHp}`);
+    // The village: it falls after more than questFailBites bites. Only bites change it.
+    const left = Math.max(0, RULES.questFailBites + 1 - g.bites);
+    setWidth(els.fkHpBar, left / (RULES.questFailBites + 1));
+    setText(els.fkHpText, g.bites > RULES.questFailBites ? 'village: FALLEN' : `village: ${left} bites left`);
     const max = Math.max(1, g.dragonMax);
     setWidth(els.hydraHpBar, g.phase === 'ready' ? 1 : g.dragonHp / max);
     setText(els.hydraHpText, g.phase === 'ready' ? 'HP = keys not rendered' : `HP ${g.dragonHp} / ${g.dragonMax} keys`);
@@ -150,8 +165,9 @@ export function createGame(els) {
     els.overlay.innerHTML = `
       <div class="bo-title">ROUND ${g.round + 1}<span class="bo-mode"> · ${g.modeTitle}</span></div>
       <div class="bo-rules">
-        <div><b class="g">GOBLIN</b> = one keystroke. Its text must show within <b>${RULES.jankMs} ms</b>, or it <b class="r">bites</b> (damage = its ms).</div>
-        <div><b class="g">DRAGON</b> = the 10,000-fiber list. Each commit is a hit; the final commit wins.</div>
+        <div><b class="g">GOBLIN</b> = one keystroke · SyncLane. Its text must show within <b>${RULES.jankMs} ms</b>, or it <b class="r">bites</b>.</div>
+        <div><b class="g">DRAGON</b> = the ${g.dragon.cells.toLocaleString('en-US')}-fiber list. Each commit is a hit; the final commit wins.</div>
+        <div>More than <b>${RULES.questFailBites} bites</b>: the village falls · <b class="r">QUEST FAILED</b>.</div>
       </div>
       <div class="bo-rule">${RANK_RULE}</div>
       <div class="bo-start blink">type to start · ↑ jump</div>`;
@@ -178,7 +194,9 @@ export function createGame(els) {
   function end(now) {
     g.phase = 'result';
     g.resultAt = now;
-    const rank = rankOf({ bites: g.bites, worst: g.worst, ko: g.ko });
+    const rank = rankOf({ bites: g.bites, worst: g.worst });
+    // Deterministic outcome: the bites decide. The dragon may be down and the quest still failed.
+    const questFailed = g.bites > RULES.questFailBites;
     const dur = Math.max(1, g.finishAt - g.startAt);
     const lat = g.latencies;
     g.result = {
@@ -186,6 +204,8 @@ export function createGame(els) {
       mode: g.modeTitle,
       form: g.form.name,
       outcome: g.outcome,
+      dragonDown: g.outcome === 'WIN',
+      questFailed,
       rank,
       goblins: g.goblinCount,
       bites: g.bites,
@@ -197,27 +217,38 @@ export function createGame(els) {
       commits: g.commits,
       frames: g.frames,
       avgFps: Math.round((g.frames / dur) * 1000),
-      fiberHp: Math.max(0, g.fiberHp),
       dragonHp: g.dragonHp,
+      cells: g.dragon.cells,
+      phases: analyzePhases(g.startAt, g.finishAt + 200),
       inputDelays: g.inputDelays.slice(),
       durationMs: Math.round(dur),
     };
     if (els.hydra) {
-      // S: the dragon stays down. A/B: it retreats. C: it gets back up and laughs.
+      // A dragon that really went down stays down (S/C) or retreats (A/B).
+      // Only a dragon that was never killed (TIME UP) stands and laughs.
       if (rank === 'A' || rank === 'B') els.hydra.classList.replace('is-collapsed', 'is-retreat');
-      if (rank === 'C') els.hydra.classList.remove('is-collapsed', 'is-retreat');
     }
     play(rank === 'S' ? 'fanfare' : rank === 'C' ? 'lose' : 'rank');
-    if (rank === 'C') setTimeout(() => play('laugh'), 1300);
+    if (g.outcome !== 'WIN') setTimeout(() => play('laugh'), 1300);
     renderResult();
   }
 
   function renderResult() {
     const r = g.result;
     if (!els.overlay) return;
-    const title = { S: 'PERFECT', A: 'GREAT!', B: 'CLEAR', C: 'GAME OVER' }[r.rank];
+    const title = r.questFailed ? 'QUEST FAILED' : { S: 'PERFECT', A: 'GREAT!', B: 'CLEAR', C: 'QUEST FAILED' }[r.rank];
     // The subtitle names the real cause of the rank.
-    const outcome = r.outcome === 'KO' ? 'K.O.' : r.rank === 'C' ? `${r.bites} bites` : r.outcome === 'WIN' ? 'DRAGON DOWN' : r.outcome;
+    const outcome = r.questFailed
+      ? r.dragonDown
+        ? `DRAGON DOWN… but the village fell (${r.bites} bites)`
+        : `the village fell (${r.bites} bites)`
+      : r.dragonDown
+        ? 'DRAGON DOWN'
+        : r.outcome;
+    const ph = r.phases?.worst;
+    const phaseLine = ph
+      ? `<div class="bo-phase">worst frame ${ph.duration} ms = render ${ph.render} · commit ${ph.commit} · style/layout/paint ${ph.styleLayoutPaint} · canvas ${ph.canvas} · other ${ph.other}</div>`
+      : '';
     const line = els.resultLine ? els.resultLine(r) : '';
     els.overlay.className = `boss-overlay is-result tier-${r.rank}`;
     els.overlay.dataset.result = JSON.stringify(r);
@@ -236,7 +267,7 @@ export function createGame(els) {
         </div>
         <div class="bo-rank rank-${r.rank}"><span>RANK</span>${r.rank}</div>
       </div>
-      ${r.rank === 'C' ? '<div class="bo-continue">CONTINUE? <b class="bo-count">10</b></div>' : ''}
+      ${phaseLine}
       ${line ? `<div class="bo-line">${line}</div>` : ''}
       <div class="bo-rule">${RANK_RULE}</div>`;
   }
@@ -289,6 +320,12 @@ export function createGame(els) {
       reset();
     },
     reset,
+    // Calibration may change the number of cells; the dragon keeps its size on screen.
+    setCells(cells) {
+      g.dragon = makeDragon(cells);
+      if (g.phase === 'ready') showReady();
+    },
+    dragonBox: DRAGON_BOX,
     onTypingStart(total) {
       if (g.phase === 'ready') g.typingTotal = total;
     },
@@ -331,6 +368,7 @@ export function createGame(els) {
     onCommit(e) {
       g.attempting = false;
       if (g.phase !== 'fight' || e.t < g.startAt) return;
+      if (e.cells && e.cells !== g.dragon.cells) return; // a cell-count change, not a keystroke
       g.commits++;
       g.listSeq = Math.max(g.listSeq, e.seq);
       g.cuts = { t0: performance.now(), q: e.q };
@@ -346,7 +384,7 @@ export function createGame(els) {
     onSliceEnd() {},
     // ↑ key. `delay` = when we handled it minus when the browser created the event.
     manualJump(delay, now) {
-      if (g.fkY < 0.5 && !g.ko && g.phase !== 'result') g.fkVy = 1500;
+      if (g.fkY < 0.5 && g.phase !== 'result') g.fkVy = 1500;
       const ms = Math.round(delay);
       if (g.phase === 'fight') g.inputDelays.push(ms);
       if (ms > RULES.jankMs) headText(`input delay: ${ms} ms`, '#ffd166', now);
@@ -377,7 +415,6 @@ export function createGame(els) {
         // The bite lands 120 ms into the lunge: damage and number at the contact frame.
         if (gb.state === 'bite' && !gb.bitten && now - gb.t0 >= 120) {
           gb.bitten = true;
-          g.fiberHp -= gb.latency;
           g.biteDamage += gb.latency;
           g.fkHitAt = now;
           g.shake = Math.min(26, 6 + gb.latency / 10);
@@ -394,7 +431,7 @@ export function createGame(els) {
         if (gb.state === 'dying' && !gb.cut && now - gb.t0 >= 70) {
           gb.cut = true;
           logHit('goblin', now);
-          const x = GOBLIN_SLOTS[0] + 56;
+          const x = GOBLIN_SLOTS[0] + 48;
           g.sparks.push({ x, y: ARENA.groundY - 60, t0: now });
           play('dodge');
         }
@@ -426,10 +463,7 @@ export function createGame(els) {
           g.typingEndSeq = g.lastKeySeq;
           scheduleDragonHit(now, g.lastKeySeq, true);
         }
-        if (g.fiberHp <= 0) {
-          g.ko = true;
-          finish(now, 'KO');
-        } else if (now - g.startAt > RULES.maxRoundMs) finish(now, 'TIME UP');
+        if (now - g.startAt > RULES.maxRoundMs) finish(now, 'TIME UP');
       }
       if (g.phase === 'finishing' && now - g.finishAt > 900) end(now);
 
@@ -441,16 +475,9 @@ export function createGame(els) {
         if (g.fkY === 0) g.fkVy = 0;
       }
 
-      // GAME OVER countdown, from real time.
-      if (g.phase === 'result' && g.result?.rank === 'C' && els.overlay) {
-        const n = Math.max(0, 10 - Math.floor((now - g.resultAt) / 1000));
-        const el = els.overlay.querySelector('.bo-count');
-        if (el && el.textContent !== String(n)) el.textContent = String(n);
-      }
-
       // Knockback on the dragon and screen shake: transforms only, no layout.
       if (els.dragonKb) {
-        const kb = now < g.kbUntil ? 'translateX(16px)' : '';
+        const kb = now < g.kbUntil ? 'translateX(20px)' : '';
         if (els.dragonKb.style.transform !== kb) els.dragonKb.style.transform = kb;
       }
       if (els.arena) {
@@ -481,7 +508,7 @@ export function createGame(els) {
       // Hit flash: the dragon's silhouette in white, at the contact frame.
       if (now < g.flashUntil) {
         ctx.globalAlpha = 0.75;
-        ctx.drawImage(dragonSilhouette(), DRAGON_BOX.x + 16, DRAGON_BOX.y);
+        ctx.drawImage(dragonSilhouette(g.dragon), DRAGON_BOX.x + 20, DRAGON_BOX.y);
         ctx.globalAlpha = 1;
       }
       // Cut marks: the cells the last commit matched.
@@ -489,9 +516,10 @@ export function createGame(els) {
         ctx.globalAlpha = 1 - (now - g.cuts.t0) / 700;
         ctx.fillStyle = '#ffffff';
         let n = 0;
-        for (let i = 0; i < CELL_COUNT && n < 90; i += 7) {
-          if (SHAPE[i] && NAMES[i].includes(g.cuts.q)) {
-            const [cx, cy] = cellPos(i);
+        const d = g.dragon;
+        for (let i = 0; i < d.cells && n < 90; i += 7) {
+          if (d.shape[i] && d.names[i].includes(g.cuts.q)) {
+            const [cx, cy] = cellPos(d, i);
             for (let k = -2; k <= 2; k++) ctx.fillRect(cx + k * 3 - 2, cy - k * 3 - 2, 4, 4);
             n++;
           }
@@ -499,11 +527,11 @@ export function createGame(els) {
         ctx.globalAlpha = 1;
       }
 
-      // Dragon laughs on GAME OVER.
-      if (g.phase === 'result' && g.result?.rank === 'C') {
+      // A dragon that was never killed (TIME UP) laughs.
+      if (g.phase === 'result' && g.result && !g.result.dragonDown) {
         ctx.font = '48px DotGothic16';
         ctx.fillStyle = '#ff5d73';
-        ctx.fillText('HA! HA!', HEAD[0] + 40, HEAD[1] - 90 - Math.abs(Math.sin(now / 160)) * 16);
+        ctx.fillText('HA! HA!', HEAD[0] + 40, HEAD[1] - 70 - Math.abs(Math.sin(now / 160)) * 16);
       }
 
       drawGoblins(ctx, now);
@@ -565,7 +593,7 @@ export function createGame(els) {
       if (gb.state === 'wait' || gb.state === 'bite') slot++;
       if (gb.state === 'bite') {
         const p = Math.min(1, (now - gb.t0) / 120);
-        x += Math.sin(p * Math.PI * 0.5) * 70; // lunge into Fiber-kun
+        x += Math.sin(p * Math.PI * 0.5) * 56; // lunge into Fiber-kun
       }
       if (gb.state === 'dying') {
         const t = now - gb.t0;
@@ -578,11 +606,13 @@ export function createGame(els) {
       const img = spriteCanvas(frame, palette, GOBLIN_SCALE);
       ctx.globalAlpha = Math.max(0, alpha);
       ctx.drawImage(img, Math.round(x), ARENA.groundY - img.height);
+      const gbb = bbox(GOBLIN[0]);
+      reportBox('boss', 'goblin', { x: x + gbb.x * GOBLIN_SCALE, y: ARENA.groundY - img.height + gbb.y * GOBLIN_SCALE, w: gbb.w * GOBLIN_SCALE, h: gbb.h * GOBLIN_SCALE });
       ctx.globalAlpha = 1;
       if (gb.state === 'dying' && now - gb.t0 > 160) {
         ctx.fillStyle = '#d8dcff';
         const p = (now - gb.t0 - 160) / 160;
-        for (let i = 0; i < 6; i++) ctx.fillRect(x + 56 + Math.cos(i) * p * 60 - 8, ARENA.groundY - 56 + Math.sin(i) * p * 50 - 8, 16, 16);
+        for (let i = 0; i < 6; i++) ctx.fillRect(x + 48 + Math.cos(i) * p * 50 - 6, ARENA.groundY - 48 + Math.sin(i) * p * 40 - 6, 12, 12);
       }
     }
   }
@@ -595,14 +625,14 @@ export function createGame(els) {
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.fillRect(x + 40, ARENA.groundY - 6, HERO.size - 80, 12);
 
-    if (result && (result.rank === 'C' || g.ko)) {
+    if (result && result.questFailed) {
       const img = spriteCanvas(FIBER_KUN.rest[0], PALETTE, HERO.scale);
       ctx.save();
       ctx.translate(x + HERO.size / 2, ARENA.groundY - HERO.size / 2 + 50);
       ctx.rotate(-Math.PI / 2);
       ctx.drawImage(img, -HERO.size / 2, -HERO.size / 2);
       ctx.restore();
-      drawSword(ctx, x + HERO.size + 30, ARENA.groundY - 10, 0.05, { scale: 1.4 });
+      drawSword(ctx, x + HERO.size + 20, ARENA.groundY - 8, 0.05, { scale: SWORD });
       return;
     }
 
@@ -612,20 +642,22 @@ export function createGame(els) {
     const hurt = now - g.fkHitAt < 200;
     const frame = g.fkY > 0 ? FIBER_KUN.walk[0] : FIBER_KUN.idle[Math.floor(now / 300) % 2];
     const img = spriteCanvas(frame, hurt ? HURT_PALETTE : PALETTE, HERO.scale);
+    const hb = bbox(FIBER_KUN.idle[0]);
+    reportBox('boss', 'hero', { x: x + hb.x * HERO.scale, y: y + hb.y * HERO.scale, w: hb.w * HERO.scale, h: hb.h * HERO.scale });
     const blink = a && a.kind === 'respawn' && t < 420 && Math.floor(t / 60) % 2 === 0;
 
     // Respawn at root: a light column and a label above the head.
     if (a && a.kind === 'respawn' && t < 700) {
       ctx.globalAlpha = 0.6 * (1 - t / 700);
       ctx.fillStyle = '#9af5ea';
-      ctx.fillRect(x + HERO.size / 2 - 40, 0, 80, ARENA.groundY);
+      ctx.fillRect(x + HERO.size / 2 - 32, 0, 64, ARENA.groundY);
       ctx.globalAlpha = 1;
       const [hx] = headPoint(now);
       ctx.font = '40px DotGothic16';
       ctx.fillStyle = '#05071a';
-      ctx.fillText('RESPAWN AT ROOT', hx + 3, 333);
+      ctx.fillText('RESPAWN AT ROOT', hx + 3, 403);
       ctx.fillStyle = '#9af5ea';
-      ctx.fillText('RESPAWN AT ROOT', hx, 330);
+      ctx.fillText('RESPAWN AT ROOT', hx, 400);
     }
 
     ctx.save();
@@ -640,7 +672,7 @@ export function createGame(els) {
     ctx.restore();
 
     // Sword
-    const front = facingLeft ? x + 30 : x + HERO.size - 30;
+    const front = facingLeft ? x + 24 : x + HERO.size - 24;
     const handY = y + HERO.size * 0.62;
     let angle = 0.7;
     let trail = null;
@@ -664,18 +696,18 @@ export function createGame(els) {
       ctx.translate(front, handY);
       if (facingLeft) ctx.scale(-1, 1);
       ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-      ctx.lineWidth = 22;
+      ctx.lineWidth = 18;
       ctx.beginPath();
-      ctx.arc(0, 0, 190, trail.from, trail.to);
+      ctx.arc(0, 0, REACH, trail.from, trail.to);
       ctx.stroke();
       ctx.restore();
     }
-    drawSword(ctx, front, handY, angle, { scale: 1.4, flip: facingLeft });
+    drawSword(ctx, front, handY, angle, { scale: SWORD, flip: facingLeft });
     if (result && result.rank === 'S') {
       ctx.fillStyle = '#ffd166';
       for (let i = 0; i < 6; i++) {
         const k = now / 300 + (i * Math.PI) / 3;
-        ctx.fillRect(Math.round(front + Math.cos(k) * 70) - 7, Math.round(handY - 220 + Math.sin(k) * 34) - 7, 14, 14);
+        ctx.fillRect(Math.round(front + Math.cos(k) * 56) - 6, Math.round(handY - 170 + Math.sin(k) * 28) - 6, 12, 12);
       }
     }
   }

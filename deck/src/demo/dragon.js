@@ -1,10 +1,15 @@
-// The boss: a generic pixel dragon made of 10,000 grid cells. Each cell is one React
-// component, so one render of the dragon walks 10,000+ fibers. It faces left, toward the hero.
+// The boss: a generic pixel dragon made of grid cells. Each cell is one React component,
+// so one render of the dragon walks that many fibers. It faces left, toward the hero.
 // Original shape, drawn with simple geometry (no franchise design).
+//
+// The shape is designed on a 125×80 grid. The deck can draw it with fewer cells
+// (calibration, section 7 of the Phase 3a brief): the same shape is sampled on a coarser
+// grid and then scaled up to the same size on screen, so only the DOM size changes.
 
-export const COLS = 125;
-export const ROWS = 80;
-export const CELL_COUNT = COLS * ROWS;
+export const DESIGN = { cols: 125, rows: 80 };
+// Cell counts the calibration can choose from: 125×80, 100×64, 75×48, 50×32 (same 25:16 shape).
+export const CELL_LEVELS = [10000, 6400, 3600, 1600];
+export const DEFAULT_CELLS = 10000;
 
 const SYLLABLES = ['to', 'kyo', 'fi', 'ber', 're', 'act', 'la', 'ne', 'yo', 'ka', 'mi', 'su', 'shi', 'ta', 'na', 'ri', 'ko', 'sa'];
 
@@ -20,13 +25,13 @@ function mulberry32(seed) {
 }
 
 const rand = mulberry32(2026);
-export const NAMES = Array.from({ length: CELL_COUNT }, () => {
+const NAMES = Array.from({ length: DEFAULT_CELLS }, () => {
   let s = '';
   for (let k = 0; k < 3; k++) s += SYLLABLES[Math.floor(rand() * SYLLABLES.length)];
   return s;
 });
 
-// Grid points used by the game (impact point, head).
+// Points used by the game (impact point, head), in design-grid cells.
 export const DRAGON_POINTS = { head: [14, 20], chest: [46, 46] };
 
 // 0 bg · 1 body · 2 eye · 3 shade · 4 highlight · 5 mouth · 6 teeth/claws · 7 wing · 8 belly · 9 horn
@@ -91,24 +96,61 @@ function baseShape(x, y) {
   return 0;
 }
 
-const RAW = Array.from({ length: CELL_COUNT }, (_, i) => baseShape(i % COLS, Math.floor(i / COLS)));
-const at = (x, y) => (x < 0 || y < 0 || x >= COLS || y >= ROWS ? 0 : RAW[y * COLS + x]);
+const DESIGN_SHAPE = Array.from({ length: DESIGN.cols * DESIGN.rows }, (_, i) => baseShape(i % DESIGN.cols, Math.floor(i / DESIGN.cols)));
+const used = (() => {
+  let r0 = Infinity, r1 = -1, c0 = Infinity, c1 = -1;
+  DESIGN_SHAPE.forEach((v, i) => {
+    if (!v) return;
+    const x = i % DESIGN.cols;
+    const y = Math.floor(i / DESIGN.cols);
+    r0 = Math.min(r0, y); r1 = Math.max(r1, y); c0 = Math.min(c0, x); c1 = Math.max(c1, x);
+  });
+  return { r0, r1, c0, c1 };
+})();
+// The design grid rows/columns the shape really uses (for the scale test).
+export const SHAPE_ROWS_USED = used.r1 - used.r0 + 1;
+export const SHAPE_COLS_USED = used.c1 - used.c0 + 1;
 
-// Shading on body cells: 4 = highlight (open air above), 3 = shade (open air below).
-export const SHAPE = RAW.map((v, i) => {
-  if (v !== 1) return v;
-  const x = i % COLS;
-  const y = Math.floor(i / COLS);
-  if (at(x, y - 1) === 0) return 4;
-  if (at(x, y + 1) === 0 || at(x, y + 2) === 0) return 3;
-  return 1;
-});
-export const BASE_CLASS = SHAPE.map((s) => `c${s}`);
-export const HIT_CLASS = SHAPE.map((s) => (s === 0 ? 'h0' : 'h1'));
-
-export function countHits(q) {
-  if (!q) return 0;
-  let n = 0;
-  for (let i = 0; i < CELL_COUNT; i++) if (NAMES[i].includes(q)) n++;
-  return n;
+const cache = new Map();
+// The dragon drawn with `cells` grid cells (one of CELL_LEVELS).
+export function makeDragon(cells = DEFAULT_CELLS) {
+  if (!CELL_LEVELS.includes(cells)) cells = DEFAULT_CELLS;
+  if (cache.has(cells)) return cache.get(cells);
+  const k = Math.round(Math.sqrt(cells / (DESIGN.cols * DESIGN.rows)) * 5) / 5; // 1, 0.8, 0.6, 0.4
+  const cols = Math.round(DESIGN.cols * k);
+  const rows = Math.round(DESIGN.rows * k);
+  const count = cols * rows;
+  const raw = Array.from({ length: count }, (_, i) => {
+    const dx = Math.floor(((i % cols) + 0.5) * (DESIGN.cols / cols));
+    const dy = Math.floor((Math.floor(i / cols) + 0.5) * (DESIGN.rows / rows));
+    return DESIGN_SHAPE[dy * DESIGN.cols + dx];
+  });
+  const at = (x, y) => (x < 0 || y < 0 || x >= cols || y >= rows ? 0 : raw[y * cols + x]);
+  // Shading on body cells: 4 = highlight (open air above), 3 = shade (open air below).
+  const shape = raw.map((v, i) => {
+    if (v !== 1) return v;
+    const x = i % cols;
+    const y = Math.floor(i / cols);
+    if (at(x, y - 1) === 0) return 4;
+    if (at(x, y + 1) === 0 || (k === 1 && at(x, y + 2) === 0)) return 3;
+    return 1;
+  });
+  const names = NAMES.slice(0, count);
+  const d = {
+    cells: count,
+    cols,
+    rows,
+    names,
+    shape,
+    baseClass: shape.map((v) => `c${v}`),
+    hitClass: shape.map((v) => (v === 0 ? 'h0' : 'h1')),
+    countHits(q) {
+      if (!q) return 0;
+      let n = 0;
+      for (let i = 0; i < count; i++) if (names[i].includes(q)) n++;
+      return n;
+    },
+  };
+  cache.set(cells, d);
+  return d;
 }

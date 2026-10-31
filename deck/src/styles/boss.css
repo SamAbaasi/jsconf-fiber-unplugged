@@ -1,7 +1,7 @@
 .boss { position: absolute; inset: 0; }
 
 .boss-top { position: absolute; left: 30px; right: 30px; top: 18px; height: 76px; display: flex; align-items: center; gap: 30px; }
-.boss-title { font-size: 52px; color: var(--rank-a); text-shadow: 4px 4px 0 #000; }
+.boss-title { font-size: 52px; white-space: nowrap; color: var(--rank-a); text-shadow: 4px 4px 0 #000; }
 .boss-modes { display: flex; gap: 14px; }
 .boss-same { margin-left: auto; font-size: 28px; color: var(--muted); white-space: nowrap; }
 .boss-mode { font-size: 30px; padding: 4px 14px; border: 4px solid var(--dim); border-radius: 10px; color: var(--dim); }
@@ -24,16 +24,15 @@
 .boss-layer { position: absolute; left: 0; top: 0; width: 1150px; height: 760px; }
 .boss-fx { pointer-events: none; }
 
-.boss-hydra { position: absolute; left: 640px; top: 370px; transition: transform 1.2s ease-in, opacity 1.2s ease-in; }
+.boss-hydra { position: absolute; transform-origin: 50% 100%; transition: transform 1.2s ease-in, opacity 1.2s ease-in; }
 .boss-hydra.is-collapsed { transform: translateY(120px) rotate(8deg); opacity: 0.2; }
 .boss-hydra.is-retreat { transform: translateX(80px); opacity: 0.6; }
 .dragon-kb { transition: none; }
+.dragon-scale { transform-origin: 0 0; }
+/* Columns, rows and size are set inline from the cell count (calibration can change it). */
 .dragon-grid {
   display: grid;
-  grid-template-columns: repeat(125, 4px);
   grid-auto-rows: 4px;
-  width: 500px;
-  height: 320px;
   /* Keep the commit's style and paint work inside the grid. */
   contain: strict;
 }
@@ -178,3 +177,5 @@
 .bc-reuse { font-size: 32px; color: #fff; }
 .bc-reuse b { color: var(--rank-s); font-weight: 400; }
 .bc-verdict { margin-top: 10px; font-size: 30px; color: var(--ink); }
+.bo-phase { font-size: 26px; color: #c9cdf5; margin-top: 10px; line-height: 1.3; }
+.bc-why { font-size: 20px; color: #c9cdf5; }

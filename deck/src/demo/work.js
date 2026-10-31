@@ -45,7 +45,7 @@ export function calibrate() {
 }
 
 export function setMicrosPerCell(us) {
-  settings.microsPerCell = Math.max(0, Math.min(60, us));
+  settings.microsPerCell = Math.max(0, Math.min(80, us));
   itersPerCell = Math.round(itersPerMicro * settings.microsPerCell);
 }
 
