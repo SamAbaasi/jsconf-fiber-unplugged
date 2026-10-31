@@ -49,3 +49,16 @@
 .ys-big { font-size: 180px; color: var(--rank-d); text-shadow: 10px 10px 0 #000; }
 .ys-line { font-size: 64px; color: #fff; }
 .ys-catch { font-size: 56px; color: var(--rank-a); }
+
+/* Step 7: why a dud skill? */
+.yd-slide { position: absolute; inset: 0; background: #0b0c2e; color: #fff; padding: 50px 90px; box-sizing: border-box; }
+.yd-title { font-size: 88px; color: #ffd166; text-shadow: 6px 6px 0 #000; margin-bottom: 30px; }
+.yd-floor { width: 1300px; padding: 22px 34px; margin-bottom: 26px; border: 6px solid #c9cdf5; background: #1d1b4a; }
+.yd-lower { border-color: #34e0a1; }
+.yd-floor-name { font-size: 56px; }
+.yd-floor-job { font-size: 40px; color: #c9cdf5; }
+.yd-click { position: absolute; left: 90px; top: 640px; padding: 22px 34px; font-size: 52px; background: #3a1530; border: 6px solid #ff5d73; }
+.yd-click b { color: #ffd166; font-weight: 400; }
+.yd-skip { font-size: 40px; color: #ff9fb2; margin-top: 6px; }
+.yd-line { position: absolute; left: 90px; right: 90px; top: 880px; font-size: 48px; }
+.yd-ids { position: absolute; right: 90px; bottom: 30px; font-size: 30px; color: #8a90b5; }

@@ -1,7 +1,7 @@
 import { AnimatedSprite, Sprite } from '../ui/Sprite.jsx';
 import { FACES, FIBER_KUN, PALETTE } from '../sprites/fiberkun.js';
 import { LINES } from '../content/lines.js';
-import { useStepSound } from '../audio/useStepSound.js';
+import { LevelUp } from '../ui/LevelUp.jsx';
 import '../styles/status.css';
 
 // Real FiberNode fields (A8: ReactFiber.js#L134-L173 at v19.3.1) for the CartIcon fiber:
@@ -76,43 +76,22 @@ function Lanes() {
   );
 }
 
-function Skills({ step }) {
-  return (
-    <div className="st-skills">
-      <div className="st-skills-title">SKILLS</div>
-      <div className="st-skill pop-in">
-        <div className="st-skill-name">
-          《Yield》
-          <span className="st-stamp" lang="ja">
-            外れスキル?
-          </span>
-        </div>
-        <div className="st-skill-effect">{LINES.statusSkillEffect.text}</div>
-        {step >= 5 && (
-          <div className="st-tooltip fade-in">
-            <div>{LINES.statusSkillWhen.text}</div>
-            <div className="st-tooltip-not">{LINES.statusSkillNot.text}</div>
-          </div>
-        )}
-      </div>
-      {step >= 6 && (
-        <div className="st-skill is-sealed pop-in">
-          <div className="st-skill-name">
-            <span className="st-seal" lang="ja">
-              封印
-            </span>
-            《Yield · 25 ms》
-          </div>
-          <code className="st-flag">enableThrottledScheduling = false</code>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function Status({ step, preview }) {
-  useStepSound(step, { 4: 'unlock', 6: 'unlock' }, preview);
-  const face = step >= 4 && step < 6 ? FACES.shocked : step >= 6 ? FACES.smug : null;
+  if (step >= 4) {
+    return (
+      <LevelUp
+        from={1}
+        to={2}
+        skill="《Yield》"
+        stamp="外れスキル?"
+        effect={LINES.statusSkillEffect.text}
+        real="shouldYield()"
+        claims={['A2', 'B1']}
+        preview={preview}
+      />
+    );
+  }
+  const face = null;
   return (
     <div className="st-slide">
       <div className="win st-win pop-in">
@@ -124,7 +103,7 @@ export function Status({ step, preview }) {
             </div>
             <div>
               <div className="st-name">Fiber-kun</div>
-              <div className="st-class">Lv 19.3.1</div>
+              <div className="st-class">Lv 1 · React 19.3.1</div>
             </div>
           </div>
           <div className="st-fields">
@@ -140,7 +119,6 @@ export function Status({ step, preview }) {
           {step === 1 && <TreeLinks />}
           {step === 2 && <Twin />}
           {step === 3 && <Lanes />}
-          {step >= 4 && <Skills step={step} />}
         </div>
       </div>
     </div>

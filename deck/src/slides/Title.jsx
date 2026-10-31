@@ -1,6 +1,7 @@
 import { AnimatedSprite } from '../ui/Sprite.jsx';
 import { Starfield } from '../ui/Starfield.jsx';
 import { FIBER_KUN, PALETTE } from '../sprites/fiberkun.js';
+import { SCALES } from '../sprites/scale.js';
 import '../styles/title.css';
 
 export function Title({ step }) {
@@ -25,7 +26,7 @@ export function Title({ step }) {
             こんにちは!
           </div>
         )}
-        <AnimatedSprite frames={FIBER_KUN.idle} palette={PALETTE} scale={22} fps={2.5} />
+        <AnimatedSprite frames={FIBER_KUN.idle} palette={PALETTE} scale={SCALES.title} fps={2.5} />
         <div className="title-shadow" />
       </div>
 

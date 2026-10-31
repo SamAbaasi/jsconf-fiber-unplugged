@@ -5,6 +5,7 @@ import { useStepClock } from '../ui/useStepClock.js';
 import { useStepSound } from '../audio/useStepSound.js';
 import { FIBER_KUN, PALETTE } from '../sprites/fiberkun.js';
 import { LINES } from '../content/lines.js';
+import { LevelUp } from '../ui/LevelUp.jsx';
 import { EDGES, POS, SLICE_MS, stateAt, stepDuration } from './yieldScript.js';
 import '../styles/yield.css';
 
@@ -138,10 +139,37 @@ function Summary() {
   );
 }
 
+// Step 7: why is it a "dud"? Two layers (C1); a click is SyncLane and skips the Scheduler (C2),
+// so it never gets 《Yield》: only non-blocking lanes are sliced (A4).
+function WhyDud() {
+  return (
+    <div className="yd-slide">
+      <div className="yd-title">{LINES.dudTitle.text}</div>
+      <div className="yd-floor yd-upper">
+        <div className="yd-floor-name">Lanes · the reconciler</div>
+        <div className="yd-floor-job">decide WHAT to render, and if it may be sliced</div>
+      </div>
+      <div className="yd-floor yd-lower">
+        <div className="yd-floor-name">Scheduler</div>
+        <div className="yd-floor-job">decides WHEN · 5 ms slices · 《Yield》 lives here</div>
+      </div>
+      <div className="yd-click pop-in">
+        click / key = SyncLane → <b>microtask</b> → render now
+        <div className="yd-skip">never enters the Scheduler queue · no 《Yield》</div>
+      </div>
+      <div className="yd-line fade-in">{LINES.dudLine.text}</div>
+      <div className="yd-ids">CLAIMS C1 · C2 · A4</div>
+    </div>
+  );
+}
+
 export function YieldSkill({ step, preview }) {
+  if (step >= 8)
+    return <LevelUp from={2} to={3} skill="Guild card" effect="read the quest board: who is urgent?" real="lanes (31-bit mask)" claims={['D1']} preview={preview} />;
+  if (step === 7) return <WhyDud />;
   useStepSound(step, { 0: 'unlock' }, preview);
   if (step === 0) return <SkillCard />;
   if (step === 1) return <CodeCompare />;
-  if (step >= 6) return <Summary />;
+  if (step === 6) return <Summary />;
   return <Walk step={step} preview={preview} />;
 }

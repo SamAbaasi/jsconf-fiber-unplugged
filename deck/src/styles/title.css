@@ -54,7 +54,7 @@
   text-shadow: 3px 3px 0 #000;
 }
 
-.title-hero { position: absolute; right: 190px; top: 330px; width: 352px; text-align: center; }
+.title-hero { position: absolute; right: 300px; top: 640px; width: 192px; text-align: center; }
 .title-shadow { width: 260px; height: 26px; margin: -6px auto 0; background: rgba(0, 0, 0, 0.35); border-radius: 50%; }
 .title-bubble {
   position: absolute;
