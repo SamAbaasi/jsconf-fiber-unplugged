@@ -83,6 +83,7 @@ function ingest(state, now, game) {
           game?.onDiscard(e.t);
         }
         state.attempts.push({ start: e.t, end: null, q: e.q, sync: e.task === null, status: 'running' });
+        game?.onAttempt(e.t);
         break;
       }
       case 'render:commit': {
@@ -91,6 +92,7 @@ function ingest(state, now, game) {
           last.status = 'committed';
           last.end = e.t;
           state.committed++;
+          game?.onCommit(e.t, e.q);
         }
         break;
       }

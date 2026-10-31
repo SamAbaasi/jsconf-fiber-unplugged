@@ -30,12 +30,14 @@ const MODES = [
   },
 ];
 
-// Auto-type: "tokyo", clear it, then "fiber". About 2 seconds of steady typing.
+// Auto-type: five words, one letter every 150 ms, a short hold, then clear.
+// About 6 seconds of steady typing, so each round has a real fight before the result.
+const TYPE_EVERY_MS = 150;
 const TYPING_SCRIPT = (() => {
   const steps = [];
-  for (const word of ['tokyo', 'fiber']) {
+  for (const word of ['tokyo', 'fiber', 'react', 'sushi', 'kyoto']) {
     for (let i = 1; i <= word.length; i++) steps.push(word.slice(0, i));
-    if (word === 'tokyo') steps.push('tokyo', 'tokyo', '');
+    steps.push(null, null, ''); // hold (no event), hold, clear
   }
   return steps;
 })();
@@ -50,8 +52,8 @@ function typeInto(input, value) {
 
 // The line under the result. Only shown when the real result matches it.
 function resultLine(r, modeKey) {
-  if (r.outcome === 'WIN' && modeKey !== 'sync') return LINES.resultWinYield.text;
-  if (r.outcome !== 'WIN' && modeKey === 'sync') return LINES.resultLoseSync.text;
+  if ((r.rank === 'S' || r.rank === 'A') && modeKey !== 'sync') return LINES.resultWinYield.text;
+  if (r.rank === 'C' && modeKey === 'sync') return LINES.resultLoseSync.text;
   return '';
 }
 
@@ -67,7 +69,7 @@ export function BossFight({ step }) {
   // Only fed while in deferred mode; otherwise it holds null and never defers.
   const deferredText = useDeferredValue(mode.key === 'deferred' ? text : null);
 
-  const names = ['arena', 'world', 'fx', 'hydra', 'overlay', 'fkHpBar', 'fkHpText', 'hydraHpBar', 'hydraHpText', 'respawnText', 'timeline', 'fpsGraph', 'fps', 'worst'];
+  const names = ['arena', 'world', 'fx', 'hydra', 'hydraName', 'timer', 'overlay', 'fkHpBar', 'fkHpText', 'hydraHpBar', 'hydraHpText', 'respawnText', 'timeline', 'fpsGraph', 'fps', 'worst'];
   const refs = Object.fromEntries(names.map((n) => [n, useRef(null)]));
   const inputRef = useRef(null);
   const typingTimer = useRef(0);
@@ -116,9 +118,10 @@ export function BossFight({ step }) {
     const input = inputRef.current;
     let i = 0;
     typingTimer.current = setInterval(() => {
-      typeInto(input, TYPING_SCRIPT[i++]);
+      const v = TYPING_SCRIPT[i++];
+      if (v !== null) typeInto(input, v);
       if (i >= TYPING_SCRIPT.length) stopTyping();
-    }, 110);
+    }, TYPE_EVERY_MS);
   };
   const clear = () => {
     stopTyping();
@@ -145,8 +148,20 @@ export function BossFight({ step }) {
       else if (e.key === '[') h.changeWork(-2);
       else if (e.key === 'i' || e.key === 'I') inputRef.current?.focus();
     };
+    // ↑ = jump. Handled on window in the capture phase, before the deck sees it, so it never
+    // changes the slide and the input keeps its focus. Input delay = handling time − event time.
+    const onJump = (e) => {
+      if (e.key !== 'ArrowUp' || e.ctrlKey || e.metaKey || e.altKey) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (e.repeat) return;
+      const now = performance.now();
+      gameRef.current?.manualJump(now - e.timeStamp, now);
+    };
+    window.addEventListener('keydown', onJump, { capture: true });
     window.addEventListener('keydown', onKey);
     return () => {
+      window.removeEventListener('keydown', onJump, { capture: true });
       window.removeEventListener('keydown', onKey);
       clearInterval(typingTimer.current);
     };
@@ -167,13 +182,19 @@ export function BossFight({ step }) {
             </div>
           ))}
         </div>
+        <div className="boss-same">
+          same work: {CELL_COUNT.toLocaleString('en-US')} fibers × {micros} µs
+        </div>
       </header>
 
       <div className="boss-arena" ref={refs.arena}>
         <canvas ref={refs.world} className="boss-layer pixelated" width={ARENA.w} height={ARENA.h} />
-        <div className={`boss-hydra ${pending ? 'is-pending' : ''}`} ref={refs.hydra}>
-          <HydraList query={listQuery} />
+        <div className="boss-hydra" ref={refs.hydra}>
+          <div className={pending ? 'is-pending' : ''}>
+            <HydraList query={listQuery} />
+          </div>
         </div>
+        <div className="boss-timer" ref={refs.timer} />
         <canvas ref={refs.fx} className="boss-layer boss-fx pixelated" width={ARENA.w} height={ARENA.h} />
 
         <div className="hud hud-fk">
@@ -185,16 +206,14 @@ export function BossFight({ step }) {
           <div className="hud-num hud-respawn" ref={refs.respawnText} />
         </div>
         <div className="hud hud-boss">
-          <div className="hud-name">JANK HYDRA</div>
+          <div className="hud-name" ref={refs.hydraName}>
+            JANK HYDRA
+          </div>
           <div className="hud-bar">
             <div className="hud-fill is-boss" ref={refs.hydraHpBar} />
           </div>
           <div className="hud-num" ref={refs.hydraHpText} />
-          <div className="hud-num hud-sub">
-            {CELL_COUNT.toLocaleString('en-US')} fibers × {micros} µs
-          </div>
         </div>
-        <div className="boss-overlay" ref={refs.overlay} />
       </div>
 
       <div className="win boss-input">
@@ -243,6 +262,9 @@ export function BossFight({ step }) {
         <div className="win-title">CODE</div>
         <pre className="boss-code-pre">{mode.code.join('\n')}</pre>
       </div>
+
+      {/* READY and RESULT panels cover the instruments between rounds, so the arena stays visible. */}
+      <div className="boss-overlay" ref={refs.overlay} />
     </div>
   );
 }
