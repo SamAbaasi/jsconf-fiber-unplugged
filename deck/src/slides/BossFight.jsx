@@ -270,7 +270,7 @@ export function BossFight({ step }) {
         <canvas ref={refs.fx} className="boss-layer boss-fx pixelated" width={ARENA.w} height={ARENA.h} />
 
         <div className="hud hud-fk">
-          <div className="hud-name">Fiber-kun</div>
+          <div className="hud-name">Fiber-kun · village</div>
           <div className="hud-bar">
             <div className="hud-fill is-fk" ref={refs.fkHpBar} />
           </div>

@@ -26,11 +26,9 @@
 /* [SYSTEM] window: plum panel with a gold double border (our own style). */
 .sys-win {
   position: absolute;
-  left: 0;
-  right: 0;
-  margin: 0 auto;
-  top: 120px;
-  width: 1200px;
+  left: 60px;
+  top: 60px;
+  width: 840px;
   padding: 36px 56px 40px;
   background: #241433;
   border: 6px double #ffd166;
@@ -40,6 +38,6 @@
   z-index: 12;
 }
 .sys-tag { font-size: 44px; color: #ffd166; letter-spacing: 4px; margin-bottom: 18px; }
-.sys-line { font-size: 60px; line-height: 1.3; }
+.sys-line { font-size: 52px; line-height: 1.3; }
 .sys-small { font-size: 44px; color: #c9cdf5; margin-top: 10px; }
-.sys-gate { font-size: 56px; color: #ffd166; margin-top: 18px; }
+.sys-gate { font-size: 48px; color: #ffd166; margin-top: 18px; }

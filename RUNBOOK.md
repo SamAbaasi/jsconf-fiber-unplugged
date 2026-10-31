@@ -38,8 +38,8 @@ Why two numbers? On a slow machine the long frames in round 2 are not the render
      - mostly **render** → the next smaller DOM at the same µs (less render work too); at 1,600 cells, 2 µs less per cell (the same as the **[** key).
    - It stops at the first setting where round 2 is S in ≥ 4/5 **and** round 1 is still C in ≥ 4/5.
    - One setting for all three rounds, so the comparison stays fair.
-4. When it's done, the chosen setting is shown big, for example **3,600 × 33 µs**, with a table of every run and the measured split of round 2's worst frame.
-5. Reuse it: open the deck as `index.html?work=33&cells=3600#/1/0` (your values). Bookmark that URL. The top bar of the boss slide shows "same work: 3,600 fibers × 33 µs".
+4. When it's done, the chosen setting is shown big, for example **3,600 × 12 µs** (what it chose in a headless test at 4× CPU throttle), with a table of every run and the measured split of round 2's worst frame.
+5. Reuse it: open the deck as `index.html?work=12&cells=3600#/1/0` (your values). Bookmark that URL. The top bar of the boss slide shows "same work: 3,600 fibers × 12 µs".
 
 If the panel says **"No setting works on this machine"**, it shows the reason:
 - *"round 2 is already S, but round 1 is C in only N/5"*: this machine is so fast that round 1 doesn't jank clearly even at the starting value. Try once more with more work: press **]** a few times (it shows the value in the top bar), then **K**, **K** again.

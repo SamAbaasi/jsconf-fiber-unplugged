@@ -132,3 +132,15 @@ Runs = the 5-run `--stability` test + 3 walk-through runs (round 1) / 3 walk-thr
 | d · deviceScaleFactor 2 | C ×5 | S ×5 | S ×4, A ×1 |
 
 Goal (R1 = C and R2 = S in ≥ 4/5 for a, b, c-2×) is met at 12 µs, so no tuning was needed. At 4×, round 2 has 0–1 bites but frames of 150–330 ms. Lower work does not fix it: at 6 µs R2 = A ×2, B ×3; at 2 µs R2 = B ×5. The long frames are not in the sliced render; my best guess is the commit (thousands of cell class changes + paint) and the canvas drawing, all 4× slower. On such a laptop the calibration would honestly report "no value works".
+
+## Phase 3a: one story spine (2026-10-31)
+
+**Story:** a tired frontend developer from Tehran, the LONG TASK truck, a fantasy Japan, a torii Gate, a dungeon = the main thread, five floors (one verified React mechanism each), the boss room, a bestiary and a party-recruit ending. Plan in [`STORYBOARD.md`](STORYBOARD.md): 25:30 of content + 4:30 buffer, 6 metaphors.
+
+**Built:** STORYBOARD.md · cold open (Tehran → truck → Japan → torii → [SYSTEM]) · title · the Gate (main thread, gate ranks) · Floor 1 STATUS + LEVEL UP · Floor 2 《Yield》 + "why a dud" + LEVEL UP · Floors 3–5 placeholders · boss room rework · 図鑑 bestiary · 仲間募集 ending (DRAFT).
+
+**New claims:** L1 (long task = 50 ms, MDN + W3C), L2 (one main thread, MDN), L3 (our gate ranks; only S is spec), L4 (Long Animation Frames), C11 (a Scheduler task past its 5 s timeout renders without slicing: found while measuring the 4× throttle case). D1 now has exact line links (#L41-L110).
+
+**Scale bible:** `deck/src/sprites/scale.js` + `deck/scripts/check-scale.mjs` (runs before every build and in `npm run check`; fails the build on a bad ratio) + a second check in the browser that measures what the scenes really drew. `deck/.check/LINEUP.png` shows every sprite on one ruler.
+
+**Boss room:** dragon 60% of the arena, Fiber-kun 25%, goblins 12.6%. Round 1 is decided by bites only: "DRAGON DOWN… but the village fell. QUEST FAILED." The result screen shows the measured split of the worst frame (render · commit · style/layout/paint · canvas · other). Calibration (K) tunes cells (10,000 / 6,400 / 3,600 / 1,600) and µs per cell; `?cells=N&work=N`.
