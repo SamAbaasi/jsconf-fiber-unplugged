@@ -701,7 +701,7 @@ export function createGame(els) {
       ctx.drawImage(img, Math.round(x), Math.round(y));
       ctx.globalAlpha = 1;
       const gbb = bbox(GOBLIN[0]);
-      if (gb.state === 'wait') reportBox('boss', 'goblin', { x, y: y + gbb.y * GOBLIN_SCALE, w: gbb.w * GOBLIN_SCALE, h: gbb.h * GOBLIN_SCALE });
+      if (alpha === 1) reportBox('boss', 'goblin', { x, y: y + gbb.y * GOBLIN_SCALE, w: gbb.w * GOBLIN_SCALE, h: gbb.h * GOBLIN_SCALE });
     }
   }
 
