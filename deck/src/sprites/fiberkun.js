@@ -14,6 +14,9 @@ export const PALETTE = {
   o: '#ff9f1c', // thread tip (a tiny node)
   p: '#ff9fb2', // cheeks
   f: '#3b2a6b', // feet
+  r: '#c23a50', // necktie (previous life)
+  c: '#8a5a2b', // briefcase
+  C: '#5c3a1a', // briefcase shade
 };
 
 const BODY = [
@@ -87,7 +90,35 @@ export const FIBER_KUN = { idle: [idle0, idle1], walk: [walk0, walk1], rest: [re
 
 export const FACES = { normal: idle0, shocked, smug, sleeping };
 
-for (const [name, frames] of Object.entries({ ...FIBER_KUN, faces: Object.values(FACES) })) {
+// Previous life: the same character as a tired salaryman. No headband yet, tired eyes
+// with dark bags, a white collar and a necktie.
+function setRow(rows, y, from, chars) {
+  rows[y] = rows[y].slice(0, from) + chars + rows[y].slice(from + chars.length);
+}
+const office = BODY.slice();
+office[6] = '..kbbbbbbbbbbbk.';
+office[7] = '..kbbbbbbbbbbbk.';
+office[8] = '..kbkkkbbbkkkbk.';
+office[9] = '..kbwwkbbbwwkbk.';
+office[10] = '..kbddbbbbbddbk.';
+office[11] = '..kdbbbbbbbbbdk.'; // no mouth: so the tie below reads as a tie
+office[12] = '...kdbbrrrbbddk.';
+office[13] = '....kdddrddddk..';
+const OFFICE_FEET = ['....kfkrk.kfk...', '....kkkkk.kkk...'];
+export const SALARYMAN = [[...office, ...OFFICE_FEET], [...squash(office), ...OFFICE_FEET]];
+// A briefcase, held next to him.
+export const BRIEFCASE = [
+  '..kkkk..',
+  '..k..k..',
+  'kkkkkkkk',
+  'kccccccK',
+  'kcCyycck',
+  'kcccccck',
+  'kCCCCCCk',
+  'kkkkkkkk',
+].map((r) => r.replace(/K/g, 'k'));
+
+for (const [name, frames] of Object.entries({ ...FIBER_KUN, faces: Object.values(FACES), salaryman: SALARYMAN })) {
   for (const f of frames) {
     if (f.length !== 16 || f.some((r) => r.length !== 16)) throw new Error(`Fiber-kun frame "${name}" is not 16×16`);
   }
