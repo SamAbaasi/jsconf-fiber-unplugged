@@ -63,9 +63,31 @@ const restBody = BODY.slice();
 restBody.splice(8, 2, ...EYES_CLOSED);
 const rest = [...squash(restBody), ...FEET.sit];
 
+// Portrait faces for the dialogue box. Only the eye and mouth rows change.
+function face(rows) {
+  const out = BODY.slice();
+  out.splice(8, rows.length, ...rows);
+  return [...out, ...FEET.stand];
+}
+const shocked = face([
+  '..kbwwwbbbwwwbk.',
+  '..kbwkwbbbwkwbk.',
+  '..kbpbbkkkbbpbk.',
+  '..kdbbbkkkbbbdk.',
+]);
+const smug = face([
+  '..kbkkkbbbkkkbk.',
+  '..kbwwkbbbwwkbk.',
+  '..kbpbbbbbbkkbk.',
+  '..kdbbbkkkkbbdk.',
+]);
+const sleeping = face(['..kbbbbbbbbbbbk.', '..kbkkkbbbkkkbk.']);
+
 export const FIBER_KUN = { idle: [idle0, idle1], walk: [walk0, walk1], rest: [rest] };
 
-for (const [name, frames] of Object.entries(FIBER_KUN)) {
+export const FACES = { normal: idle0, shocked, smug, sleeping };
+
+for (const [name, frames] of Object.entries({ ...FIBER_KUN, faces: Object.values(FACES) })) {
   for (const f of frames) {
     if (f.length !== 16 || f.some((r) => r.length !== 16)) throw new Error(`Fiber-kun frame "${name}" is not 16×16`);
   }
