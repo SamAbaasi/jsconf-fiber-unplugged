@@ -11,13 +11,13 @@ import { SHAPE_ROWS_USED, SHAPE_COLS_USED } from '../demo/dragon.js';
 export const SCALES = {
   world: 8, // Fiber-kun in world scenes: 16 × 8 = 128 px
   title: 12, // title close-up
-  truck: 20, // the LONG TASK truck in the cold open (world scale 8)
-  torii: 15, // the Gate in the other world (world scale 8)
+  truck: 8, // the LONG TASK truck: same pixel size as Fiber-kun (80×40 sprite)
+  torii: 8, // the torii: same pixel size as Fiber-kun (52×58 sprite)
   boss: {
     arenaH: 760, // boss arena height H, px
     hero: 12, // Fiber-kun in the arena
     goblin: 6,
-    dragonH: 456, // the dragon's drawn height, px (its grid is scaled to this)
+    dragonH: 480, // the dragon's drawn height, px: 80 rows × 6 px, so 10,000 cells are whole pixels
   },
 };
 

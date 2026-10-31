@@ -11,7 +11,8 @@
 // RULES.questFailBites bites = QUEST FAILED, even if the dragon went down.
 // Hit effects (flash, spark, number, knockback) are drawn at the point of contact.
 // All of this runs in the monitor's rAF loop, outside React.
-import { FIBER_KUN, PALETTE } from '../sprites/fiberkun.js';
+import { FIBER_KUN, FACES, PALETTE } from '../sprites/fiberkun.js';
+const FACE_HURT = FACES.shocked;
 import { GOBLIN, GOBLIN_PALETTE } from '../sprites/goblin.js';
 import { drawSword } from '../sprites/sword.js';
 import { spriteCanvas } from '../ui/Sprite.jsx';
@@ -40,7 +41,7 @@ export const RANK_RULE = 'S: 0 bites, no frame > 100 ms · A: ≤ 2 bites, ≤ 1
 export const FORMS = [
   { name: 'JANK DRAGON', cls: 'form-1', crown: false },
   { name: 'JANK DRAGON · FROST', cls: 'form-2', crown: false },
-  { name: 'JANK DRAGON · SHADOW', cls: 'form-3', crown: true },
+  { name: 'JANK DRAGON · NIGHT', cls: 'form-3', crown: false },
 ];
 
 // Proportions come from the scale bible (sprites/scale.js; checked by scripts/check-scale.mjs).
@@ -48,20 +49,26 @@ export const ARENA = { w: 1150, h: SCALES.boss.arenaH, groundY: 690 };
 const DRAGON_H = SCALES.boss.dragonH; // the dragon's drawn height
 const DESIGN_PX = DRAGON_H / DESIGN.rows; // one design-grid cell on screen
 const DRAGON_W = Math.round(DESIGN.cols * DESIGN_PX);
-export const DRAGON_BOX = { x: ARENA.w - DRAGON_W - 16, y: ARENA.groundY - DRAGON_H, w: DRAGON_W, h: DRAGON_H };
+// Right edge 24 px inside the arena (5 px border), so the 12 px knockback never clips the tail.
+export const DRAGON_BOX = { x: ARENA.w - 5 - DRAGON_W - 24, y: ARENA.groundY - DRAGON_H, w: DRAGON_W, h: DRAGON_H };
 const HERO_SCALE = SCALES.boss.hero;
-const HERO = { homeX: 270, scale: HERO_SCALE, size: 16 * HERO_SCALE, dash: 160 };
+const HERO_SIZE = 16 * HERO_SCALE;
 const SWORD = 1.05; // sword scale, matched to the hero size
 const REACH = 148; // slash arc radius = blade tip (142 px × SWORD)
+const HERO_HOME = 270;
+// Dash so the blade tip passes the dragon's chest at the contact frame (computed, not tuned).
+const CHEST_PT = [DRAGON_BOX.x + DRAGON_POINTS.chest[0] * (DRAGON_H / DESIGN.rows), DRAGON_BOX.y + DRAGON_POINTS.chest[1] * (DRAGON_H / DESIGN.rows)];
+const HAND_Y = ARENA.groundY - HERO_SIZE + HERO_SIZE * 0.62;
+const HAND_X = CHEST_PT[0] - Math.sqrt(REACH ** 2 - (HAND_Y - CHEST_PT[1]) ** 2);
+const CONTACT_ANGLE = Math.atan2(CHEST_PT[1] - HAND_Y, CHEST_PT[0] - HAND_X);
+const HERO = { homeX: HERO_HOME, scale: HERO_SCALE, size: HERO_SIZE, dash: Math.round(HAND_X - (HERO_HOME + HERO_SIZE - 24)) };
 const GOBLIN_SCALE = SCALES.boss.goblin;
 const GOBLIN_SLOTS = [150, 56, -38];
 const DASH_MS = 90;
 const SLASH_MS = 80;
 const RETURN_MS = 150;
-// Contact: the moment the blade tip passes the dragon's chest. With the dash above, the hand is
-// at (598, 617) and the chest at (683, 496): angle −0.96 rad, reached 41% into the slash.
-const IMPACT_AT = DASH_MS + Math.round(SLASH_MS * 0.41);
-const HURT_PALETTE = Object.fromEntries(Object.entries(PALETTE).map(([k]) => [k, k === 'k' ? '#5a0a1a' : '#ff5d73']));
+// Contact: the moment the slash (from −2.3 to +1.0 rad) passes the chest angle.
+const IMPACT_AT = DASH_MS + Math.round(SLASH_MS * ((CONTACT_ANGLE + 2.3) / 3.3));
 const WHITE_GOBLIN = Object.fromEntries(Object.entries(GOBLIN_PALETTE).map(([k]) => [k, '#ffffff']));
 
 // A small log of landed hits, so tests can find the frames where contact happens.
@@ -167,9 +174,9 @@ export function createGame(els) {
     els.overlay.innerHTML = `
       <div class="bo-title">ROUND ${g.round + 1}<span class="bo-mode"> · ${g.modeTitle}</span></div>
       <div class="bo-rules">
-        <div><b class="g">GOBLIN</b> = one keystroke · SyncLane. Its text must show within <b>${RULES.jankMs} ms</b>, or it <b class="r">bites</b>.</div>
-        <div><b class="g">DRAGON</b> = the ${g.dragon.cells.toLocaleString('en-US')}-fiber list. Each commit is a hit; the final commit wins.</div>
-        <div>More than <b>${RULES.questFailBites} bites</b>: the village falls · <b class="r">QUEST FAILED</b>.</div>
+        <div><b class="g">GOBLIN</b> = 1 keystroke. Late &gt; ${RULES.jankMs} ms → it <b class="r">bites</b>.</div>
+        <div><b class="g">DRAGON</b> = the big list. Each update on screen = 1 hit.</div>
+        <div>&gt; ${RULES.questFailBites} bites → <b class="r">QUEST FAILED</b></div>
       </div>
       <div class="bo-rule">${RANK_RULE}</div>
       <div class="bo-start blink">type to start · ↑ jump</div>`;
@@ -177,7 +184,13 @@ export function createGame(els) {
 
   function reset() {
     Object.assign(g, freshRound());
-    if (els.hydra) els.hydra.className = `boss-hydra ${g.form.cls}`;
+    if (els.hydra) {
+      // Snap back without the collapse transition (otherwise the legs sink into the grass).
+      els.hydra.style.transition = 'none';
+      els.hydra.className = `boss-hydra ${g.form.cls}`;
+      void els.hydra.offsetWidth;
+      els.hydra.style.transition = '';
+    }
     if (els.dragonKb) els.dragonKb.style.transform = '';
     if (els.arena) els.arena.style.transform = '';
     setText(els.hydraName, g.form.name);
@@ -249,7 +262,7 @@ export function createGame(els) {
         : r.outcome;
     const ph = r.phases?.worst;
     const phaseLine = ph
-      ? `<div class="bo-phase">worst frame ${ph.duration} ms = render ${ph.render} · commit ${ph.commit} · style/layout/paint ${ph.styleLayoutPaint} · canvas ${ph.canvas} · other ${ph.other}</div>`
+      ? `<div class="bo-phase">longest frame by the Long Animation Frame API: ${ph.duration} ms = render ${ph.render} · commit ${ph.commit} · style/layout/paint ${ph.styleLayoutPaint} · canvas ${ph.canvas} · other ${ph.other}</div>`
       : '';
     const line = els.resultLine ? els.resultLine(r) : '';
     els.overlay.className = `boss-overlay is-result tier-${r.rank}`;
@@ -262,7 +275,7 @@ export function createGame(els) {
           <div class="bo-grid">
             <span>bites</span><b>${r.bites} / ${r.goblins}</b>
             <span>worst key</span><b>${r.worstLatencyMs} ms</b>
-            <span>worst frame</span><b>${r.worstFrameMs} ms</b>
+            <span>worst frame gap</span><b>${r.worstFrameMs} ms</b>
             <span>thrown away</span><b>${r.thrownAway}</b>
             <span>commits</span><b>${r.commits}</b>
           </div>
@@ -421,7 +434,7 @@ export function createGame(els) {
           g.fkHitAt = now;
           g.shake = Math.min(26, 6 + gb.latency / 10);
           g.shakeAt = now;
-          headText(`-${gb.latency}ms BITE!`, '#ff5d73', now);
+          headText(`BITE! ${gb.latency} ms late`, '#ff5d73', now);
           play('hit');
         }
         // After biting, Fiber-kun turns and cuts it down.
@@ -447,7 +460,7 @@ export function createGame(els) {
         imp.done = true;
         logHit(imp.final ? 'dragon-final' : 'dragon', now);
         g.dragonHp = imp.hp;
-        g.flashUntil = now + 90;
+        g.flashUntil = now + 50; // about 3 frames, half strength: a flash, not a strobe
         g.kbUntil = now + 130;
         g.shake = 8;
         g.shakeAt = now;
@@ -479,7 +492,7 @@ export function createGame(els) {
 
       // Knockback on the dragon and screen shake: transforms only, no layout.
       if (els.dragonKb) {
-        const kb = now < g.kbUntil ? 'translateX(20px)' : '';
+        const kb = now < g.kbUntil ? 'translateX(12px)' : '';
         if (els.dragonKb.style.transform !== kb) els.dragonKb.style.transform = kb;
       }
       if (els.arena) {
@@ -509,8 +522,8 @@ export function createGame(els) {
 
       // Hit flash: the dragon's silhouette in white, at the contact frame.
       if (now < g.flashUntil) {
-        ctx.globalAlpha = 0.75;
-        ctx.drawImage(dragonSilhouette(g.dragon), DRAGON_BOX.x + 20, DRAGON_BOX.y);
+        ctx.globalAlpha = 0.5;
+        ctx.drawImage(dragonSilhouette(g.dragon), DRAGON_BOX.x + 12, DRAGON_BOX.y);
         ctx.globalAlpha = 1;
       }
       // Cut marks: the cells the last commit matched.
@@ -554,9 +567,9 @@ export function createGame(els) {
       // Numbers above Fiber-kun's head (beside him while he is in the air), below the HUD,
       // never on his face. At most two lines.
       g.headLog = g.headLog.filter((h) => now - h.t0 < 1300);
-      const airborne = g.fkY > 20;
-      const hx = heroX(now) + HERO.size / 2 + (airborne ? 380 : 0);
-      const hy = ARENA.groundY - HERO.size - 52;
+      // Left of Fiber-kun, above the goblins (they are the ones who bite), never on the dragon.
+      const hx = 230;
+      const hy = ARENA.groundY - HERO.size - 52 - (g.fkY > 20 ? 0 : 0);
       ctx.font = '44px DotGothic16';
       g.headLog.slice(-2).forEach((h, i, list) => {
         const age = (now - h.t0) / 1300;
@@ -628,22 +641,20 @@ export function createGame(els) {
     ctx.fillRect(x + 40, ARENA.groundY - 6, HERO.size - 80, 12);
 
     if (result && result.questFailed) {
+      // Sits down, eyes closed, sword on the ground: the quest failed.
       const img = spriteCanvas(FIBER_KUN.rest[0], PALETTE, HERO.scale);
-      ctx.save();
-      ctx.translate(x + HERO.size / 2, ARENA.groundY - HERO.size / 2 + 50);
-      ctx.rotate(-Math.PI / 2);
-      ctx.drawImage(img, -HERO.size / 2, -HERO.size / 2);
-      ctx.restore();
-      drawSword(ctx, x + HERO.size + 20, ARENA.groundY - 8, 0.05, { scale: SWORD });
+      ctx.drawImage(img, x, ARENA.groundY - img.height);
+      drawSword(ctx, x + HERO.size + 10, ARENA.groundY - 10, 0.02, { scale: SWORD });
       return;
     }
 
     const a = g.action;
     const t = a ? now - a.t0 : Infinity;
     const facingLeft = a && a.kind === 'goblin' && t < 260;
-    const hurt = now - g.fkHitAt < 200;
-    const frame = g.fkY > 0 ? FIBER_KUN.walk[0] : FIBER_KUN.idle[Math.floor(now / 300) % 2];
-    const img = spriteCanvas(frame, hurt ? HURT_PALETTE : PALETTE, HERO.scale);
+    const hurtT = now - g.fkHitAt;
+    const hurt = hurtT < 160;
+    const frame = g.fkY > 0 ? FIBER_KUN.walk[0] : hurt ? FACE_HURT : FIBER_KUN.idle[Math.floor(now / 300) % 2];
+    const img = spriteCanvas(frame, PALETTE, HERO.scale);
     const hb = bbox(FIBER_KUN.idle[0]);
     reportBox('boss', 'hero', { x: x + hb.x * HERO.scale, y: y + hb.y * HERO.scale, w: hb.w * HERO.scale, h: hb.h * HERO.scale });
     const blink = a && a.kind === 'respawn' && t < 420 && Math.floor(t / 60) % 2 === 0;
@@ -663,7 +674,7 @@ export function createGame(els) {
     }
 
     ctx.save();
-    if (blink) ctx.globalAlpha = 0.35;
+    if (blink || (hurt && Math.floor(hurtT / 50) % 2 === 1)) ctx.globalAlpha = 0.35;
     if (facingLeft) {
       ctx.translate(x + HERO.size, y);
       ctx.scale(-1, 1);
@@ -676,7 +687,7 @@ export function createGame(els) {
     // Sword
     const front = facingLeft ? x + 24 : x + HERO.size - 24;
     const handY = y + HERO.size * 0.62;
-    let angle = 0.7;
+    let angle = 0.3; // at rest: blade forward and a little down, above the ground
     let trail = null;
     if (result && result.rank === 'S') angle = -Math.PI / 2;
     else if (a && a.kind === 'dash' && t < DASH_MS + SLASH_MS + RETURN_MS) {

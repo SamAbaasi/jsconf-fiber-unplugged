@@ -17,7 +17,7 @@ const ENTRIES = [
   { name: 'Expedition', real: 'Transition lane: sliced, interruptible', ids: 'A4 E4' },
   { name: 'RESPAWN AT ROOT', real: 'interrupt: throw away, restart from root', ids: 'B2' },
   { icon: [GOBLIN[0], GOBLIN_PALETTE, 3], name: 'Goblin', real: 'one keystroke (SyncLane)', ids: 'D2' },
-  { name: 'Dragon', real: 'the heavy list render (transition)', ids: 'A4 E4 F1' },
+  { name: 'Dragon', real: 'the heavy list render', ids: 'A4 E4 F1' },
 ];
 
 export function Bestiary() {

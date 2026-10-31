@@ -6,6 +6,7 @@ import { spriteCanvas } from '../ui/Sprite.jsx';
 import { TRUCK, TRUCK_PALETTE, TRUCK_LABEL_BOX } from '../sprites/truck.js';
 import { FIBER_KUN, PALETTE, DEV, LAPTOP, COFFEE } from '../sprites/fiberkun.js';
 import { TORII, TORII_PALETTE } from '../sprites/torii.js';
+import { TEHRAN_FA } from '../sprites/tehranSign.js';
 import { drawSword } from '../sprites/sword.js';
 import { SCALES, bbox, reportBox } from '../sprites/scale.js';
 import { burnIters, ensureCalibrated, itersFor } from '../demo/work.js';
@@ -19,7 +20,7 @@ import '../styles/cold.css';
 // (flushSync → SyncLane, never sliced: A1, A4, I4) of HEAVY_COUNT components,
 // each doing about HEAVY_MICROS µs of real work (~1.2 s in total).
 // The number on screen is the measured gap between the two animation frames around it.
-const HEAVY_COUNT = 5000;
+const HEAVY_COUNT = 4200;
 const HEAVY_MICROS = 240;
 const DRIVE_MS = 450; // fast entrance: no dead air
 const FLY_MS = 1100;
@@ -29,6 +30,8 @@ const TS = SCALES.truck;
 const ME_X = 1320;
 const HERO_X = 700; // reborn Fiber-kun, in front of the torii
 const TORII_X = 980;
+const TOWER_X = 1010; // the TV tower: away from the measured-number label at the top left
+const SIGN_X = 1620;
 
 const HeavyItem = ({ iters }) => {
   burnIters(iters);
@@ -60,15 +63,12 @@ function tehran() {
   });
   g.fillStyle = '#ffffff';
   for (let i = 0; i < 80; i++) g.fillRect((i * 211) % 1920, (i * 97) % 300, i % 9 ? 3 : 6, i % 9 ? 3 : 6);
-  // crescent moon (pixel circle minus an offset circle)
+  // full moon (pixel circle)
   for (let y = -40; y <= 40; y += 8) {
     for (let x = -40; x <= 40; x += 8) {
-      const inMoon = x * x + y * y <= 40 * 40;
-      const inShadow = (x - 20) * (x - 20) + (y + 8) * (y + 8) <= 36 * 36;
-      if (inMoon && !inShadow) {
-        g.fillStyle = '#f4f1ff';
-        g.fillRect(1600 + x, 110 + y, 8, 8);
-      }
+      if (x * x + y * y > 40 * 40) continue;
+      g.fillStyle = (x + y) % 24 === 0 ? '#d6daf7' : '#f4f1ff';
+      g.fillRect(1400 + x, 150 + y, 8, 8);
     }
   }
   // Alborz: a long snowy ridge to the north
@@ -82,25 +82,25 @@ function tehran() {
     if (snow > 0) g.fillRect(x, top, 8, step8(Math.min(56, snow * 0.9 + 8)));
   }
   // A tall TV tower silhouette (generic: tapered shaft, a big multi-ring pod, an antenna).
-  const tx = 430;
+  const tx = TOWER_X;
   g.fillStyle = '#17143f';
   for (let y = GROUND; y > GROUND - 440; y -= 8) {
     const w = step8(36 + Math.max(0, (y - (GROUND - 160)) * 0.45));
     g.fillRect(tx - w / 2, y - 8, w, 8);
   }
   const rings = [
-    [-560, 24, 96],
-    [-536, 32, 150],
-    [-504, 40, 196],
-    [-464, 24, 168],
-    [-440, 16, 112],
+    [-576, 24, 112],
+    [-552, 32, 176],
+    [-520, 48, 232],
+    [-472, 32, 200],
+    [-440, 16, 128],
   ];
   for (const [dy, h, w] of rings) g.fillRect(tx - w / 2, GROUND + dy, w, h);
   g.fillRect(tx - 8, GROUND - 680, 16, 120); // antenna
   g.fillStyle = '#ffd166';
-  for (let k = -4; k <= 4; k++) g.fillRect(tx + k * 20 - 4, GROUND - 490, 8, 10);
+  for (let k = -5; k <= 5; k++) g.fillRect(tx + k * 20 - 4, GROUND - 500, 8, 10);
   g.fillStyle = '#9af5ea';
-  for (let k = -3; k <= 3; k++) g.fillRect(tx + k * 18 - 3, GROUND - 524, 6, 8);
+  for (let k = -4; k <= 4; k++) g.fillRect(tx + k * 18 - 3, GROUND - 540, 6, 8);
   g.fillStyle = '#ff5d73';
   g.fillRect(tx - 8, GROUND - 692, 16, 12); // aircraft light
   // low city with lit windows
@@ -113,7 +113,10 @@ function tehran() {
     g.fillRect(x, GROUND - h, w, h);
     g.fillStyle = '#ffd166';
     for (let wy = GROUND - h + 18; wy < GROUND - 20; wy += 34) {
-      for (let wx = x + 14; wx < x + w - 14; wx += 26) if ((wx * 7 + wy * 3 + k) % 5 === 0) g.fillRect(wx, wy, 10, 14);
+      for (let wx = x + 14; wx < x + w - 14; wx += 26) {
+        const behindHim = wx > ME_X - 120 && wx < ME_X + 240; // keep the sky behind his thread dark
+        if (!behindHim && (wx * 7 + wy * 3 + k) % 5 === 0) g.fillRect(wx, wy, 10, 14);
+      }
     }
     x += w + 6;
     k++;
@@ -125,19 +128,19 @@ function tehran() {
   g.fillRect(0, GROUND, 1920, 8);
   g.fillStyle = '#ffd166';
   for (let dx = 40; dx < 1920; dx += 200) g.fillRect(dx, 742, 100, 10);
-  // street sign: blue, white border, on a pole
-  const sx = 1660;
+  // street sign board (its text is drawn every frame, after the pixel font has loaded)
   g.fillStyle = '#8a90b5';
-  g.fillRect(sx + 108, GROUND - 330, 12, 330);
+  g.fillRect(SIGN_X + 124, GROUND - 330, 12, 330);
   g.fillStyle = '#ffffff';
-  g.fillRect(sx, GROUND - 400, 228, 92);
+  g.fillRect(SIGN_X, GROUND - 480, 260, 160);
   g.fillStyle = '#1f4fa8';
-  g.fillRect(sx + 8, GROUND - 392, 212, 76);
+  g.fillRect(SIGN_X + 8, GROUND - 472, 244, 144);
+  // تهران on top (pixel bitmap, ×2), TEHRAN below (pixel font)
   g.fillStyle = '#ffffff';
-  g.font = '52px DotGothic16';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText('TEHRAN', sx + 114, GROUND - 352);
+  const fw = TEHRAN_FA[0].length * 2;
+  TEHRAN_FA.forEach((row, y) => {
+    for (let i = 0; i < row.length; i++) if (row[i] === '#') g.fillRect(SIGN_X + 130 - fw / 2 + i * 2, GROUND - 462 + y * 2, 2, 2);
+  });
   tehranCache = c;
   return c;
 }
@@ -155,7 +158,7 @@ function japan() {
     g.fillRect(0, i * 100, 1920, 101);
   });
   // Mt Fuji: a wide cone with a flat top and a snow cap with jagged edge
-  const fx = 1180;
+  const fx = 520; // left of the torii, so the snow cap stays visible
   const top = 250;
   for (let y = top; y < GROUND - 60; y += 8) {
     const half = 70 + (y - top) * 1.55;
@@ -208,6 +211,14 @@ function japan() {
   return c;
 }
 
+function drawSignText(g) {
+  g.fillStyle = '#ffffff';
+  g.font = '48px DotGothic16';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText('TEHRAN', SIGN_X + 130, GROUND - 362);
+}
+
 function drawToriiGlow(g, ts, strength) {
   const img = spriteCanvas(TORII, TORII_PALETTE, SCALES.torii);
   const cx = TORII_X + img.width / 2;
@@ -219,8 +230,8 @@ function drawToriiGlow(g, ts, strength) {
   g.fillStyle = grad;
   g.fillRect(cx - 440, cy - 440, 880, 880);
   // the gate's inside: a shimmering portal between the pillars
-  const b = bbox(TORII);
-  const inner = { x: TORII_X + 8 * SCALES.torii, y: GROUND - img.height + 12 * SCALES.torii, w: 10 * SCALES.torii, h: (b.h - 12 - 4) * SCALES.torii };
+  const T = SCALES.torii;
+  const inner = { x: TORII_X + 16 * T, y: GROUND - img.height + 21 * T, w: 20 * T, h: 30 * T };
   g.fillStyle = `rgba(160, 120, 255, ${0.25 + 0.25 * strength * pulse})`;
   g.fillRect(inner.x, inner.y, inner.w, inner.h);
   for (let i = 0; i < 6; i++) {
@@ -249,17 +260,17 @@ function drawTruck(g, x, label) {
   g.fillStyle = '#120c2c';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.font = '68px DotGothic16';
+  g.font = '72px DotGothic16';
   const cx = x + (b.x + b.w / 2) * TS;
   const cy = y + (b.y + b.h / 2) * TS;
-  g.fillText('LONG TASK', cx, cy - (label ? 32 : 0));
+  g.fillText('LONG TASK', cx, cy - (label ? 34 : 0));
   if (label) {
     g.font = '56px DotGothic16';
     g.fillText(label, cx, cy + 40);
   }
   // headlight beam from the front of the cab
-  const fx = x + 31 * TS;
-  const fy = y + 7.5 * TS;
+  const fx = x + 77 * TS;
+  const fy = y + 18 * TS;
   g.fillStyle = 'rgba(255, 240, 170, 0.28)';
   g.beginPath();
   g.moveTo(fx, fy - 12);
@@ -273,14 +284,18 @@ function drawTruck(g, x, label) {
 
 // Frames per second of this very page over the last second. Right after the freeze it
 // honestly reads about 1, then climbs back.
-function drawFps(g, frames) {
+function drawFps(g, fps, lowest) {
   g.textAlign = 'right';
   g.textBaseline = 'alphabetic';
   g.font = '40px DotGothic16';
-  g.fillStyle = '#05071a';
-  g.fillText(`${frames.length} fps (last 1 s)`, 1863, 73);
-  g.fillStyle = frames.length >= 50 ? '#34e0a1' : '#ff5d73';
-  g.fillText(`${frames.length} fps (last 1 s)`, 1860, 70);
+  const lines = [[`${fps} fps (last 1 s)`, fps >= 50 ? '#34e0a1' : '#ff5d73']];
+  if (lowest !== null) lines.push([`lowest since the truck: ${lowest} fps`, '#ff5d73']);
+  lines.forEach(([t, col], i) => {
+    g.fillStyle = '#05071a';
+    g.fillText(t, 1863, 73 + i * 50);
+    g.fillStyle = col;
+    g.fillText(t, 1860, 70 + i * 50);
+  });
 }
 
 function drawBonk(g, x, y) {
@@ -297,14 +312,14 @@ function drawBonk(g, x, y) {
   g.fillText('BONK!', x, y - 96);
 }
 
-// The developer (previous life): laptop under his left side, coffee in the other hand.
+// The developer (previous life): an open laptop in front of him, a coffee in the other hand.
 function drawDev(g, x, ts) {
   const img = spriteCanvas(DEV[Math.floor(ts / 600) % 2], PALETTE, S);
   const y = GROUND - img.height;
   const lap = spriteCanvas(LAPTOP, PALETTE, S);
   const cup = spriteCanvas(COFFEE, PALETTE, S);
-  g.drawImage(lap, x - lap.width + 4 * S, y + 9 * S);
   g.drawImage(img, x, y);
+  g.drawImage(lap, x - 3 * S, y + 7 * S); // open laptop held in front, screen glowing
   g.drawImage(cup, x + 13 * S, y + 7 * S);
   const b = bbox(DEV[0]);
   reportBox('cold-open', 'previous-life', { x: x + b.x * S, y: y + b.y * S, w: b.w * S, h: b.h * S });
@@ -325,7 +340,7 @@ export function ColdOpen({ step, preview }) {
   useEffect(() => {
     const s = scene.current;
     if (step === 0) {
-      Object.assign(s, { startedAt: 0, impactDone: false, impactEnd: 0, frozenMs: null });
+      Object.assign(s, { startedAt: 0, impactDone: false, impactEnd: 0, frozenMs: null, lowest: null });
       setFrozen(null);
     } else if (step === 1 && !s.startedAt) {
       s.startedAt = performance.now();
@@ -353,7 +368,8 @@ export function ColdOpen({ step, preview }) {
         play('hit');
       }
       s.frames.push(ts);
-      while (s.frames.length && s.frames[0] < ts - 1000) s.frames.shift();
+      while (s.frames.length && s.frames[0] <= ts - 1000) s.frames.shift(); // frames in (ts − 1 s, ts]
+      if (s.frozenMs !== null) s.lowest = Math.min(s.lowest ?? Infinity, s.frames.length);
       const st = stepRef.current;
 
       // Steps 2–4: another world. Fiber-kun is reborn with a headband and a sword.
@@ -409,7 +425,8 @@ export function ColdOpen({ step, preview }) {
           flushSync(() => setRun((r) => r + 1));
         }
       }
-      drawFps(g, s.frames);
+      drawSignText(g);
+      drawFps(g, s.frames.length, s.lowest ?? null);
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);

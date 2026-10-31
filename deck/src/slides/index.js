@@ -27,7 +27,7 @@ export const slides = [
     claims: ['A1', 'A4', 'I4', 'L1', 'A8', 'L2'],
     notes: [
       '(Saman) I was a frontend engineer in Tehran…',
-      '[CLICK] Horn. The LONG TASK truck. REAL long task: flushSync renders 5,000 components (~240 µs each, ~1.2 s). Everything freezes; then the measured number and its Gate rank (S = ≥ 50 ms, L1); the fps counter honestly drops to ~1.',
+      '[CLICK] Horn. The LONG TASK truck. REAL long task: flushSync renders 4,200 components (~240 µs each, ~1.0 s of work; measured 1.1–1.5 s with React overhead). Everything freezes; then the measured number and its Gate rank (S = ≥ 50 ms, L1); the fps counter honestly drops to ~1.',
       'DRAFT: One long task. Everything stops. No frames. No input.',
       '[CLICK] White flash → a fantasy Japan. (Saman) 目が覚めたら…',
       '[CLICK] (Saman) Wait… I’m a plain JavaScript object?',
@@ -59,6 +59,7 @@ export const slides = [
   {
     id: 'status',
     title: 'Floor 1 · Lv1 STATUS',
+    floor: 'FLOOR 1 · Lv 1',
     time: '3:30',
     steps: 4,
     Component: Status,
@@ -66,7 +67,7 @@ export const slides = [
     notes: [
       'DRAFT: SYSTEM: you are a fiber now. Here is my status window.',
       '[CLICK] DRAFT: return = parent. child = first child. sibling = next one.',
-      '[CLICK] DRAFT: alternate. My twin in the other world: one copy on screen, one being built.',
+      '[CLICK] DRAFT: alternate. My twin: one copy on screen, one being built.',
       '[CLICK] DRAFT: lanes = work waiting here. childLanes = work waiting below.',
       '[CLICK] LEVEL UP Lv1 → Lv2 (fanfare). (Saman) Effect: stop working. DRAFT: My only skill… stop working. A useless skill?',
     ].join('\n'),
@@ -74,6 +75,7 @@ export const slides = [
   {
     id: 'yield',
     title: 'Floor 2 · Lv2 《Yield》',
+    floor: 'FLOOR 2 · Lv 2',
     time: '6:00',
     steps: 8,
     Component: YieldSkill,

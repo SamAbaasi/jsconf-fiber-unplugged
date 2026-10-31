@@ -16,19 +16,19 @@ const MODES = [
     key: 'sync',
     rank: 'S',
     title: 'no transition',
-    code: ['onChange(e) {', '  const v = e.target.value;', '  setText(v);   // S', '  setQuery(v);  // S', '}'],
+    code: ['onChange(e) {', '  const v = e.target.value;', '  setText(v);   // SyncLane', '  setQuery(v);  // SyncLane', '}'],
   },
   {
     key: 'transition',
     rank: 'D',
     title: 'useTransition',
-    code: ['onChange(e) {', '  const v = e.target.value;', '  setText(v);   // S', '  startTransition(() =>', '    setQuery(v));  // D', '}'],
+    code: ['onChange(e) {', '  const v = e.target.value;', '  setText(v);   // SyncLane', '  startTransition(() =>', '    setQuery(v)); // Transition', '}'],
   },
   {
     key: 'deferred',
     rank: 'D',
     title: 'useDeferredValue',
-    code: ['onChange(e) {', '  setText(e.target.value); // S', '}', 'q = useDeferredValue(text);', '<DragonList query={q} /> // D'],
+    code: ['onChange(e) {', '  setText(e.target.value); // SyncLane', '}', 'q = useDeferredValue(text);', '<DragonList query={q} /> // Transition'],
   },
 ];
 
@@ -316,7 +316,7 @@ export function BossFight({ step }) {
         </div>
         <canvas ref={refs.fpsGraph} className="boss-fps-graph" width={400} height={110} />
         <div className="boss-fps-worst">
-          worst frame <b ref={refs.worst}>–</b>
+          worst gap, last 3 s <b ref={refs.worst}>–</b>
         </div>
       </div>
 

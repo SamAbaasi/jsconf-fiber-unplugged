@@ -103,15 +103,23 @@ dev[8] = '..kbkkkbbbkkkbk.'; // heavy eyelids
 dev[9] = '..kbwkkbbbwkkbk.'; // half-closed eyes
 dev[10] = '..kbvvbbbbbvvbk.'; // dark bags
 dev[11] = '..kdbbbbkkbbbdk.'; // flat, tired mouth
+// A tired, curled-down thread (no bright tip): it must not read as a fuse.
+dev[0] = '........yy......';
+dev[1] = '.......y..y.....';
+dev[2] = '.........y......';
 export const DEV = [[...dev, ...FEET.stand], [...squash(dev), ...FEET.stand]];
 
-// A closed laptop, held under the arm (seen from the side, a thin slab with a sticker).
+// An open laptop held in front of him, the screen glowing (side view: lid up, base flat).
 export const LAPTOP = [
-  'kkkkkkkkkk',
-  'kmmmmmmmmk',
-  'kmmmmmmymk',
-  'kMMMMMMMMk',
-  'kkkkkkkkkk',
+  'kkk.......',
+  'klkk......',
+  'kllk......',
+  'klllk.....',
+  'kllllk....',
+  '.kllllk...',
+  '.kkkkkkkkk',
+  '.kmmmmmmmk',
+  '.kkkkkkkkk',
 ];
 // A paper coffee cup with a sleeve and steam.
 export const COFFEE = [

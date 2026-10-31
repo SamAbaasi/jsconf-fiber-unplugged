@@ -30,7 +30,7 @@ function SkillCard() {
 function CodeCompare() {
   return (
     <div className="ycode fade-in">
-      <Window title="OLD WORLD" className="ycode-win">
+      <Window title="SYNC LOOP" className="ycode-win">
         <pre>{'while (workInProgress !== null) {\n  performUnitOfWork(workInProgress);\n}'}</pre>
       </Window>
       <Window title="WITH 《Yield》" className="ycode-win is-new">
@@ -165,7 +165,7 @@ function WhyDud() {
 
 export function YieldSkill({ step, preview }) {
   if (step >= 8)
-    return <LevelUp from={2} to={3} skill="Guild card" effect="read the quest board: who is urgent?" real="lanes (31-bit mask)" claims={['D1']} preview={preview} />;
+    return <LevelUp from={2} to={3} skill="Quest board" effect="see who is urgent" real="lanes (31-bit mask)" claims={['D1']} preview={preview} />;
   if (step === 7) return <WhyDud />;
   useStepSound(step, { 0: 'unlock' }, preview);
   if (step === 0) return <SkillCard />;

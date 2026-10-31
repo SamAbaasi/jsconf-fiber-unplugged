@@ -25,7 +25,7 @@
 .gt-head { position: absolute; left: 80px; top: 50px; display: flex; align-items: baseline; gap: 40px; }
 .gt-title { font-size: 96px; color: #ffd166; text-shadow: 6px 6px 0 #000; }
 .gt-real { font-size: 48px; color: #c9cdf5; }
-.gt-corridor { position: absolute; left: 80px; right: 80px; top: 260px; height: 380px; background: #1d1b4a; }
+.gt-corridor { position: absolute; left: 80px; right: 80px; top: 300px; height: 380px; background: #1d1b4a; }
 .gt-wall { position: absolute; left: 0; right: 0; height: 64px; background: repeating-linear-gradient(90deg, #4a3f9a 0 96px, #3b2f8f 96px 104px); }
 .gt-wall-top { top: -64px; }
 .gt-wall-bottom { bottom: -64px; }
@@ -80,7 +80,7 @@
 .bs-title { font-size: 80px; color: #ffd166; text-shadow: 6px 6px 0 #000; }
 .bs-sub { font-size: 36px; color: #c9cdf5; }
 .bs-list { display: flex; flex-direction: column; gap: 4px; }
-.bs-row { display: grid; grid-template-columns: 100px 420px 1fr 190px; align-items: center; height: 80px; padding: 0 16px; font-size: 40px; white-space: nowrap; background: #241c42; border-left: 8px solid #6b5bd1; }
+.bs-row { display: grid; grid-template-columns: 100px 420px 1fr 190px; align-items: center; height: 78px; padding: 0 16px; font-size: 40px; white-space: nowrap; background: #241c42; border-left: 8px solid #6b5bd1; }
 .bs-row:nth-child(odd) { background: #2a2150; }
 .bs-icon { display: flex; align-items: center; justify-content: center; }
 .bs-name { color: #ffd166; }
@@ -98,3 +98,6 @@
 .end-name { font-size: 72px; margin-bottom: 18px; }
 .end-link { font-size: 44px; color: #5c3a1a; }
 .end-qr { width: 260px; height: 260px; border: 8px dashed #5c3a1a; display: flex; align-items: center; justify-content: center; font-size: 40px; line-height: 1.2; }
+
+/* Floor label on the built floors (story spine). */
+.floor-chip { position: absolute; left: 40px; top: 4px; z-index: 20; padding: 4px 18px; font-size: 30px; color: #120c2c; background: #ffd166; border: 4px solid #120c2c; box-shadow: 4px 4px 0 #000; }

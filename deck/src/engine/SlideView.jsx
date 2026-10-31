@@ -11,5 +11,11 @@ export function SlideView({ slide, step, preview = false }) {
     );
   }
   const Component = slide.Component;
-  return <Component step={step} preview={preview} />;
+  // Floor label (story spine): which dungeon floor this slide is on.
+  return (
+    <>
+      <Component step={step} preview={preview} />
+      {slide.floor && <div className="floor-chip">{slide.floor}</div>}
+    </>
+  );
 }

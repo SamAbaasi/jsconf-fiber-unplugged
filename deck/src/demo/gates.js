@@ -5,7 +5,7 @@ export const GATE_RANKS = [
   { rank: 'E', max: 5, rule: '≤ 5 ms · one slice' },
   { rank: 'D', max: 10, rule: '≤ 10 ms' },
   { rank: 'C', max: 1000 / 60, rule: '≤ 16.7 ms · one 60 Hz frame' },
-  { rank: 'B', max: 1000 / 30, rule: '≤ 33 ms · two frames' },
+  { rank: 'B', max: 1000 / 30, rule: '≤ 33.3 ms · two frames' },
   { rank: 'A', max: 50, rule: '< 50 ms', exclusive: true },
   { rank: 'S', max: Infinity, rule: '≥ 50 ms · LONG TASK (spec)' },
 ];

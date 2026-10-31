@@ -36,7 +36,7 @@ function RankCard() {
   return (
     <div className="gt-ranks pop-in">
       <div className="gt-ranks-title">GATE RANKS</div>
-      <div className="gt-ranks-sub">our ranks · S = spec (long task)</div>
+      <div className="gt-ranks-sub">danger rank of a task (our ranks · only S = spec)</div>
       {GATE_RANKS.map((r) => (
         <div key={r.rank} className={`gt-rank-row ${truck && truck.rank === r.rank ? 'is-truck' : ''}`}>
           <span className={`gate-rank rank-${r.rank}`}>{r.rank}</span>
@@ -61,7 +61,7 @@ export function Gate({ step }) {
     <div className="gt-slide">
       <div className="gt-head">
         <span className="gt-title">THE DUNGEON</span>
-        <span className="gt-real">Dungeon = main thread · Gate = one task</span>
+        <span className="gt-real">Dungeon = main thread · each task = one Gate</span>
       </div>
       {step < 2 && <Corridor stuck={step >= 1} />}
       {step < 2 && <div className="gt-caption fade-in">{step === 0 ? LINES.gateOne.text : LINES.gateStuck.text}</div>}
