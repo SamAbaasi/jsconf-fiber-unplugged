@@ -18,7 +18,7 @@ export const LINES = {
   },
   tehran: {
     by: 'saman',
-    speaker: 'Saman',
+    speaker: 'previous life', // speaker label is a draft
     face: null,
     text: 'I was a frontend engineer in Tehran…',
     claims: [],

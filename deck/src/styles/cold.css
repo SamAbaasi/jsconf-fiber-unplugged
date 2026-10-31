@@ -5,15 +5,13 @@
 .truck-canvas { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .truck-frozen {
   position: absolute;
-  left: 100px;
-  top: 60px;
-  display: flex;
-  flex-direction: column;
-  font-size: 48px;
+  left: 60px;
+  top: 24px;
+  font-size: 56px;
   color: var(--rank-a);
   text-shadow: 4px 4px 0 #000;
 }
-.truck-frozen b { font-size: 150px; font-weight: 400; line-height: 1; color: #fff; }
+.truck-frozen b { font-size: 80px; font-weight: 400; color: #fff; }
 .heavy-host { position: absolute; width: 0; height: 0; overflow: hidden; visibility: hidden; }
 .truck-flash { position: absolute; inset: 0; z-index: 15; background: #fff; pointer-events: none; animation: truck-flash 900ms ease-out forwards; }
 @keyframes truck-flash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
