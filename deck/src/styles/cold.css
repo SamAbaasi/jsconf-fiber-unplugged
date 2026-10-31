@@ -15,3 +15,31 @@
 .heavy-host { position: absolute; width: 0; height: 0; overflow: hidden; visibility: hidden; }
 .truck-flash { position: absolute; inset: 0; z-index: 15; background: #fff; pointer-events: none; animation: truck-flash 900ms ease-out forwards; }
 @keyframes truck-flash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+.truck-gate { font-size: 44px; color: #fff; margin-top: 8px; }
+.gate-rank { display: inline-block; min-width: 64px; text-align: center; padding: 0 12px; border: 4px solid currentColor; color: var(--rank-s, #ffd166); }
+.gate-rank.rank-A { color: var(--rank-a, #ff5d73); }
+.gate-rank.rank-B { color: var(--rank-b, #4cc9f0); }
+.gate-rank.rank-C { color: #c9cdf5; }
+.gate-rank.rank-D { color: var(--rank-d, #34e0a1); }
+.gate-rank.rank-E { color: #8a90b5; }
+
+/* [SYSTEM] window: plum panel with a gold double border (our own style). */
+.sys-win {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  top: 120px;
+  width: 1200px;
+  padding: 36px 56px 40px;
+  background: #241433;
+  border: 6px double #ffd166;
+  box-shadow: 0 0 0 6px #120c2c, 12px 12px 0 6px rgba(0, 0, 0, 0.45);
+  color: #fff;
+  text-align: center;
+  z-index: 12;
+}
+.sys-tag { font-size: 44px; color: #ffd166; letter-spacing: 4px; margin-bottom: 18px; }
+.sys-line { font-size: 60px; line-height: 1.3; }
+.sys-small { font-size: 44px; color: #c9cdf5; margin-top: 10px; }
+.sys-gate { font-size: 56px; color: #ffd166; margin-top: 18px; }

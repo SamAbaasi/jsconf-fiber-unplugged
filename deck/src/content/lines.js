@@ -10,7 +10,7 @@ export const LINES = {
   coldWake: {
     by: 'saman',
     speaker: '???',
-    face: 'sleeping',
+    face: 'sleeping', // now plays when Fiber-kun wakes up in the other world
     lang: 'ja',
     text: '目が覚めたら…',
     sub: '(When I woke up…)',
@@ -18,7 +18,7 @@ export const LINES = {
   },
   tehran: {
     by: 'saman',
-    speaker: 'previous life', // speaker label is a draft
+    speaker: 'Saman', // speaker label is a draft
     face: null,
     text: 'I was a frontend engineer in Tehran…',
     claims: [],
@@ -30,6 +30,10 @@ export const LINES = {
     text: 'One long task. Everything stops. No frames. No input.',
     claims: ['A1'],
   },
+  // [SYSTEM] window at the end of the cold open (DRAFT).
+  sysReborn: { by: 'draft', text: 'You have been reborn as a FiberNode.', claims: ['A8'] },
+  sysLevel: { by: 'draft', text: 'Lv 1 · skills: none', claims: [] },
+  sysGate: { by: 'draft', text: 'A Gate has opened: MAIN THREAD', claims: ['L2'] },
   wakeUp: {
     by: 'saman',
     speaker: 'Fiber-kun',
@@ -37,6 +41,17 @@ export const LINES = {
     text: 'Wait… I’m a plain JavaScript object?',
     claims: ['A8'],
   },
+
+  // The Gate = the main thread (DRAFT).
+  gateOne: { by: 'draft', text: 'One corridor. JS, layout, paint and your click. One at a time.', claims: ['L2'] },
+  gateStuck: { by: 'draft', text: 'A monster is stuck. Your click and the next frame must wait.', claims: ['L1', 'L2'] },
+
+  // Floor 2: why is Yield a "dud"? (DRAFT)
+  dudTitle: { by: 'draft', text: 'Why a dud skill?', claims: [] },
+  dudLine: { by: 'draft', text: 'A click never meets the Scheduler. It runs in a microtask, with no yield.', claims: ['C2', 'A4'] },
+
+  // Ending (DRAFT)
+  endRecruit: { by: 'draft', text: 'Looking for my next guild', claims: [] },
 
   // STATUS window
   statusTwin: { by: 'draft', text: 'My twin in the other world.', claims: ['A8'] },
