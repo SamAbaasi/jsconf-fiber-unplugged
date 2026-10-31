@@ -67,7 +67,7 @@ const HERO_SCALE = SCALES.boss.hero;
 const HERO_SIZE = 16 * HERO_SCALE;
 const SWORD = 1.05; // sword scale, matched to the hero size
 const REACH = 148; // slash arc radius = blade tip (142 px × SWORD)
-const HERO_HOME = 360;
+const HERO_HOME = 216; // in front of the dragon's mouth, just right of the castle
 // Dash so the blade tip passes the dragon's chest at the contact frame (computed, not tuned).
 const CHEST = [DRAGON_BOX.x + DRAGON_POINTS.chest[0] * DESIGN_PX, DRAGON_BOX.y + DRAGON_POINTS.chest[1] * DESIGN_PX];
 const HEAD = [DRAGON_BOX.x + DRAGON_POINTS.head[0] * DESIGN_PX, DRAGON_BOX.y + DRAGON_POINTS.head[1] * DESIGN_PX];
@@ -77,7 +77,7 @@ const CONTACT_ANGLE = Math.atan2(CHEST[1] - HAND_Y, CHEST[0] - HAND_X);
 const HERO = { homeX: HERO_HOME, scale: HERO_SCALE, size: HERO_SIZE, dash: Math.round(HAND_X - (HERO_HOME + HERO_SIZE - 24)) };
 const GOBLIN_SCALE = SCALES.boss.goblin;
 const GOBLIN_W = 8 * GOBLIN_SCALE;
-const GOBLIN_SLOTS = [252, 196]; // waiting goblins, between the village and Fiber-kun
+const GOBLIN_SLOTS = [412, 472]; // waiting goblins: right of Fiber-kun; late ones run past him to the castle
 const DASH_MS = 90;
 const SLASH_MS = 80;
 const RETURN_MS = 150;
@@ -88,9 +88,9 @@ const WHITE_GOBLIN = Object.fromEntries(Object.entries(GOBLIN_PALETTE).map(([k])
 // The village = your UI: a small castle on the ×12 grid (two towers, a wall, a gate), with six
 // lit windows; each bite darkens one. It falls when the bite ratio reaches RULES.failRatio.
 const PX = 12;
-const TOWERS = [12, 180]; // x of the two towers, 6 PX wide
+const TOWERS = [12, 132]; // x of the two towers, 6 PX wide
 const TOWER_TOP = ARENA.groundY - 11 * PX;
-const WALL = { x: 84, w: 8 * PX, top: ARENA.groundY - 6 * PX };
+const WALL = { x: 84, w: 4 * PX, top: ARENA.groundY - 6 * PX };
 const WINDOWS = 6;
 const ROOF_TOP = TOWER_TOP; // highest stone (kept for the text positions)
 // Where goblins stand once they got in, and where the fire burns: the two tower tops and the wall.
@@ -737,8 +737,7 @@ export function createGame(els) {
     ctx.fillStyle = shade;
     ctx.fillRect(WALL.x, WALL.top + 2 * PX, WALL.w, PX / 2);
     ctx.fillStyle = '#1a1430';
-    ctx.fillRect(WALL.x + 2 * PX, ARENA.groundY - 3 * PX, 4 * PX, 3 * PX);
-    ctx.fillRect(WALL.x + 3 * PX, ARENA.groundY - 4 * PX, 2 * PX, PX);
+    ctx.fillRect(WALL.x + PX, ARENA.groundY - 3 * PX, 2 * PX, 3 * PX);
     // towers with crenellations and a flag
     for (const tx of TOWERS) {
       ctx.fillStyle = stone;
@@ -816,7 +815,7 @@ export function createGame(els) {
         if (gb.quiet) alpha = 1 - t / 320;
         else if (t >= 70 && t < 160) palette = WHITE_GOBLIN; // hit flash at the contact frame
         else if (t >= 160) alpha = 1 - (t - 160) / 160;
-        if (!gb.quiet) x = GOBLIN_SLOTS[0] - Math.max(0, t - 70) * 0.25; // small knockback
+        if (!gb.quiet) x = GOBLIN_SLOTS[0] + Math.max(0, t - 70) * 0.25; // small knockback (to the right)
       }
       if (alpha <= 0) continue;
       const img = spriteCanvas(frame, palette, GOBLIN_SCALE);
@@ -851,7 +850,7 @@ export function createGame(els) {
 
     const a = g.action;
     const t = a ? now - a.t0 : Infinity;
-    const facingLeft = a && a.kind === 'goblin' && t < 260;
+    const facingLeft = false; // goblins and the dragon are both on his right
     const singed = now - g.fkHitAt < 300 && !result; // flinch while the dragon's fire hits him
     const frame = g.fkY > 0 ? FIBER_KUN.walk[0] : singed ? FACES.shocked : result && result.rank === 'S' ? FACES.smug : FIBER_KUN.idle[Math.floor(now / 300) % 2];
     const img = spriteCanvas(frame, PALETTE, HERO.scale);
@@ -924,24 +923,33 @@ export function createGame(els) {
     const age = (now - b.t0) / 600;
     const mx = DRAGON_BOX.x + 3 * DESIGN_PX; // the mouth
     const my = DRAGON_BOX.y + 24 * DESIGN_PX;
-    // Aimed at Fiber-kun: from the mouth to his body (full length at once: the freeze already happened).
+    // A stream of fire: it leaves the mouth forward (to the left, where the head faces) and curves
+    // down onto Fiber-kun (a quadratic curve), full length at once: the freeze already happened.
     const tx = heroX(now) + HERO.size / 2;
-    const ty = ARENA.groundY - HERO.size * 0.45;
-    const dx = tx - mx;
-    const dy = ty - my;
-    const len = Math.hypot(dx, dy);
-    const ux = dx / len;
-    const uy = dy / len;
-    for (let d = 0; d < len + PX; d += PX / 2) {
-      const spread = 6 + d * 0.32;
+    const ty = ARENA.groundY - HERO.size * 0.7;
+    const cx0 = mx - 150;
+    const cy0 = my + 10;
+    let prev = null;
+    let dist = 0;
+    for (let i = 0; i <= 60; i++) {
+      const u = i / 60;
+      const px0 = (1 - u) * (1 - u) * mx + 2 * (1 - u) * u * cx0 + u * u * tx;
+      const py0 = (1 - u) * (1 - u) * my + 2 * (1 - u) * u * cy0 + u * u * ty;
+      // direction of the curve here, for the width of the flame
+      const ddx = 2 * (1 - u) * (cx0 - mx) + 2 * u * (tx - cx0);
+      const ddy = 2 * (1 - u) * (cy0 - my) + 2 * u * (ty - cy0);
+      const dl = Math.hypot(ddx, ddy) || 1;
+      const nx = -ddy / dl;
+      const ny = ddx / dl;
+      if (prev) dist += Math.hypot(px0 - prev[0], py0 - prev[1]);
+      prev = [px0, py0];
+      const spread = 6 + u * 46;
       for (let k = -spread; k <= spread; k += PX) {
-        const flick = Math.floor(now / 60 + d / PX + k / PX) % 4;
+        const flick = Math.floor(now / 60 + i / 3 + k / PX) % 4;
         if (flick === 3 && Math.abs(k) > spread * 0.6) continue;
-        ctx.globalAlpha = (1 - age * age) * (0.95 - (d / len) * 0.25);
+        ctx.globalAlpha = (1 - age * age) * 0.95;
         ctx.fillStyle = Math.abs(k) < spread * 0.35 ? '#fff3b0' : flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
-        const px = mx + ux * d - uy * k;
-        const py = my + uy * d + ux * k;
-        ctx.fillRect(Math.round((px - PX / 2) / PX) * PX, Math.round((py - PX / 2) / PX) * PX, PX, PX);
+        ctx.fillRect(Math.round((px0 + nx * k - PX / 2) / PX) * PX, Math.round((py0 + ny * k - PX / 2) / PX) * PX, PX, PX);
       }
     }
     ctx.globalAlpha = 1 - age;
