@@ -111,17 +111,17 @@ export const DEV = [[...dev, ...FEET.stand], [...squash(dev), ...FEET.stand]];
 // The previous life is tired and grey-ish; the reborn Fiber-kun is bright. Same shape, new colours.
 export const DEV_PALETTE = { ...PALETTE, b: '#6f9a96', d: '#4c6f6b', l: '#a9c7c3', y: '#b8a878' };
 
-// A shoulder bag hanging at his side (strap over the shoulder).
+// A backpack on his back (seen from the side, behind him): rounded top, a front pocket.
 export const BAG = [
-  '.k......',
-  'k.k.....',
-  'k..k....',
-  'k...k...',
-  'kkkkkkkk',
-  'kcccccck',
-  'kcCCCCck',
-  'kcccccck',
-  'kkkkkkkk',
+  '.kkkk.',
+  'kCCCCk',
+  'kCccCk',
+  'kCccCk',
+  'kCCCCk',
+  'kCkkCk',
+  'kCcCCk',
+  'kCcCCk',
+  '.kkkk.',
 ];
 // A paper coffee cup with a sleeve and steam.
 export const COFFEE = [

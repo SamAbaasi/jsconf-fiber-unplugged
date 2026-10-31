@@ -310,14 +310,16 @@ function drawBonk(g, x, y) {
   g.fillText('BONK!', x, y - 96);
 }
 
-// The developer (previous life): a shoulder bag at his side, a coffee in the other hand.
+// The developer (previous life): a backpack, a coffee in his hand.
 function drawDev(g, x, ts) {
   const img = spriteCanvas(DEV[Math.floor(ts / 600) % 2], DEV_PALETTE, S);
   const y = GROUND - img.height;
   const bag = spriteCanvas(BAG, DEV_PALETTE, S);
   const cup = spriteCanvas(COFFEE, DEV_PALETTE, S);
+  g.drawImage(bag, x - 3 * S, y + 4 * S); // backpack, behind him
   g.drawImage(img, x, y);
-  g.drawImage(bag, x - 5 * S, y + 6 * S); // shoulder bag at his side
+  g.fillStyle = '#3b2a1a'; // a strap over the shoulder
+  g.fillRect(x + 3 * S, y + 6 * S, S, 6 * S);
   g.drawImage(cup, x + 13 * S, y + 7 * S);
   const b = bbox(DEV[0]);
   reportBox('cold-open', 'previous-life', { x: x + b.x * S, y: y + b.y * S, w: b.w * S, h: b.h * S });

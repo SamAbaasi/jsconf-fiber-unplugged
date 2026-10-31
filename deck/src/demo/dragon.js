@@ -88,9 +88,12 @@ function baseShape(x, y) {
   // body and belly
   if (inEllipse(x, y, 72, 52, 28, 15)) return y > 55 && x < 92 ? 8 : 1;
   // legs and claws
+  // A thick thigh, a bent shin and a foot with claws pointing forward (left), per leg.
   for (const lx of [56, 86]) {
-    if (x >= lx && x <= lx + 7 && y >= 60 && y <= 77) return 1;
-    if (x >= lx - 1 && x <= lx + 8 && y >= 78) return x % 3 === 0 ? 6 : 3;
+    if (inEllipse(x, y, lx + 4, 63, 6.5, 6)) return 1;
+    if (segDist(x, y, lx + 5, 66, lx + 2, 75) <= 2.8) return 1;
+    if (x >= lx - 3 && x <= lx + 6 && y >= 75 && y <= 77) return 1;
+    if (y >= 78 && (x === lx - 4 || x === lx - 3 || x === lx || x === lx + 1 || x === lx + 4)) return 6;
   }
   // tail: tapering curve to a spade tip
   for (let i = 0; i <= 24; i++) {
@@ -182,4 +185,29 @@ export function makeDragon(cells = DEFAULT_CELLS) {
   };
   cache.set(cells, d);
   return d;
+}
+
+// The fallen pose, drawn from the same art (12 px pixels): legs fold, the body lowers onto the
+// ground, the neck droops until the head lies on the grass, the eyes close. t = 0 … 1.
+const LEG_COLS = [26, 49]; // art columns of the legs
+const BODY_BOTTOM = 34; // first art row below the belly
+export function fallenArt(t) {
+  const out = new Array(ART.cols * ART.rows).fill(0);
+  const drop = (ax) => {
+    const base = 6;
+    const neck = ax < 26 ? (26 - ax) * 0.95 : 0;
+    return Math.round(t * (base + neck));
+  };
+  for (let ay = 0; ay < ART.rows; ay++) {
+    for (let ax = 0; ax < ART.cols; ax++) {
+      let v = ART_SHAPE[ay * ART.cols + ax];
+      if (!v) continue;
+      // legs fold away under the body
+      if (ay >= BODY_BOTTOM && ax >= LEG_COLS[0] && ax <= LEG_COLS[1] && t > 0.3) continue;
+      if (v === 2 && t >= 1) v = 5; // eyes closed
+      const ny = Math.min(ART.rows - 1, ay + drop(ax));
+      out[ny * ART.cols + ax] = v;
+    }
+  }
+  return { cols: ART.cols, rows: ART.rows, px: ART_PX, shape: out };
 }

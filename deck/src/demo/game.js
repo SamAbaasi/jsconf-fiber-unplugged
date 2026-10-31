@@ -19,7 +19,7 @@ import { FIBER_KUN, FACES, PALETTE } from '../sprites/fiberkun.js';
 import { GOBLIN, GOBLIN_PALETTE } from '../sprites/goblin.js';
 import { drawSword } from '../sprites/sword.js';
 import { spriteCanvas } from '../ui/Sprite.jsx';
-import { makeDragon, DESIGN, DESIGN_PX, DRAGON_PX, DRAGON_POINTS, DEFAULT_CELLS } from './dragon.js';
+import { makeDragon, fallenArt, DESIGN, DESIGN_PX, DRAGON_PX, DRAGON_POINTS, DEFAULT_CELLS } from './dragon.js';
 import { SCALES, bbox, reportBox } from '../sprites/scale.js';
 import { analyzePhases } from './phases.js';
 import { eventLog } from '../instrument/eventLog.js';
@@ -124,6 +124,34 @@ function dragonSilhouette(d) {
   return c;
 }
 
+// Colours of the dragon's art classes per form (the same as boss.css), for the fallen pose.
+const BASE_COLORS = { 1: '#b8324f', 2: '#ffd166', 3: '#7a1f36', 4: '#e8607c', 5: '#2a0a14', 6: '#ffffff', 7: '#5a1a3a', 8: '#f0a070', 9: '#e8dcc0' };
+const FORM_COLORS = {
+  'form-1': BASE_COLORS,
+  'form-2': { ...BASE_COLORS, 1: '#3f8fc9', 3: '#24608f', 4: '#a9e4ff', 7: '#1d4a73', 8: '#d8f3ff' },
+  'form-3': { ...BASE_COLORS, 1: '#6a55a8', 3: '#44337a', 4: '#a796e6', 7: '#3a2a66', 8: '#a99ccf', 2: '#ff5d73' },
+};
+const FALL_MS = 700;
+const FALL_STEPS = 8;
+const fallCache = new Map();
+function fallenCanvas(cls, k) {
+  const key = `${cls}:${k}`;
+  if (fallCache.has(key)) return fallCache.get(key);
+  const art = fallenArt(k / FALL_STEPS);
+  const colors = FORM_COLORS[cls] || BASE_COLORS;
+  const c = document.createElement('canvas');
+  c.width = art.cols * art.px;
+  c.height = art.rows * art.px;
+  const g = c.getContext('2d');
+  art.shape.forEach((v, i) => {
+    if (!v) return;
+    g.fillStyle = colors[v] || colors[1];
+    g.fillRect((i % art.cols) * art.px, Math.floor(i / art.cols) * art.px, art.px, art.px);
+  });
+  fallCache.set(key, c);
+  return c;
+}
+
 // Every round's trace (for the REPLAY step): raw events + frame times, by round index.
 export const traces = (globalThis.__roundTraces ||= {});
 function captureTrace(t0, t1) {
@@ -176,6 +204,7 @@ function freshRound() {
     fkHitAt: -1e9,
     finishAt: 0,
     finalScheduled: false,
+    fallAt: 0, // when the dragon started to fall
     inputDelays: [],
     result: null,
     resultAt: 0,
@@ -236,7 +265,10 @@ export function createGame(els) {
     g.finishAt = now;
     g.outcome = outcome;
     // The dragon falls whenever the list really showed the last keystroke (it did render).
-    if (outcome === 'WIN' && els.hydra) els.hydra.classList.add('is-collapsed');
+    if (outcome === 'WIN') {
+      g.fallAt = now;
+      if (els.hydra) els.hydra.classList.add('is-collapsed'); // the canvas draws the fallen pose
+    }
   }
 
   function end(now) {
@@ -553,6 +585,13 @@ export function createGame(els) {
       ctx.textBaseline = 'middle';
       const r = g.phase === 'result' ? g.result : null;
 
+      // The fallen dragon (drawn here once it is down; the DOM grid is hidden then).
+      if (g.fallAt) {
+        const k = Math.min(FALL_STEPS, Math.floor(((now - g.fallAt) / FALL_MS) * FALL_STEPS));
+        if (r && r.questFailed) ctx.filter = 'grayscale(0.9) brightness(0.8)';
+        ctx.drawImage(fallenCanvas(g.form.cls, k), DRAGON_BOX.x, DRAGON_BOX.y);
+        ctx.filter = 'none';
+      }
       // Hit flash: the dragon's silhouette in white, at the contact frame.
       if (now < g.flashUntil) {
         ctx.globalAlpha = 0.5;
