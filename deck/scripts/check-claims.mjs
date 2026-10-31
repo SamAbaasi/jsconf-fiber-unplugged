@@ -11,7 +11,7 @@ const repo = path.dirname(deck);
 const read = (p) => readFileSync(p, 'utf8');
 const errors = [];
 
-const claimIds = new Set([...read(path.join(repo, 'CLAIMS.md')).matchAll(/^\| ([A-J]\d+) \|/gm)].map((m) => m[1]));
+const claimIds = new Set([...read(path.join(repo, 'CLAIMS.md')).matchAll(/^\| ([A-L]\d+) \|/gm)].map((m) => m[1]));
 
 function files(dir) {
   return readdirSync(dir).flatMap((f) => {
@@ -31,7 +31,7 @@ for (const file of sources) {
 const jokes = read(path.join(repo, 'JOKES.md'));
 for (const row of jokes.split('\n').filter((l) => l.startsWith('| ') && !l.startsWith('| Trope') && !l.startsWith('|---'))) {
   const col = row.split('|')[2] || '';
-  for (const id of col.matchAll(/\b([A-J]\d{1,2})\b/g)) used.set(id[1], 'JOKES.md');
+  for (const id of col.matchAll(/\b([A-L]\d{1,2})\b/g)) used.set(id[1], 'JOKES.md');
 }
 for (const [id, where] of used) if (!claimIds.has(id)) errors.push(`claim ${id} (used in ${where}) is not in CLAIMS.md`);
 
