@@ -144,3 +144,20 @@ Goal (R1 = C and R2 = S in ≥ 4/5 for a, b, c-2×) is met at 12 µs, so no tuni
 **Scale bible:** `deck/src/sprites/scale.js` + `deck/scripts/check-scale.mjs` (runs before every build and in `npm run check`; fails the build on a bad ratio) + a second check in the browser that measures what the scenes really drew. `deck/.check/LINEUP.png` shows every sprite on one ruler.
 
 **Boss room:** dragon 60% of the arena, Fiber-kun 25%, goblins 12.6%. Round 1 is decided by bites only: "DRAGON DOWN… but the village fell. QUEST FAILED." The result screen shows the measured split of the worst frame (render · commit · style/layout/paint · canvas · other). Calibration (K) tunes cells (10,000 / 6,400 / 3,600 / 1,600) and µs per cell; `?cells=N&work=N`.
+
+**Independent review:** a separate agent (it saw only screenshots, LINEUP.png, the recordings and the checklist) wrote [`reviews/PHASE3A_REVIEW.md`](reviews/PHASE3A_REVIEW.md) (raw). Fixed: the Tehran "bomb + weapon" read (open glowing laptop, curled thread, no lit windows behind him), the sign (pixel font + Persian bitmap), the moon, truck and torii redrawn at ×8, Fuji visible, the boss glitches (flash, red hurt blob, BITE text on the dragon, crown, sword in the ground, sinking legs, clipped FPS tab), `// S` / `// D` → `// SyncLane` / `// Transition`, one meaning for Gate, floor labels, several drafts reworded. Not fixed (decisions for Saman or a later phase) are listed in the report to Saman.
+
+**Final checks (build after the review fixes):** `check-claims` OK · `check-scale` OK · `check-offline --record` exit 0, 38 states, 0 console errors, 0 network requests, scale bible measured in the page OK (dragon 0.632 H, Fiber-kun 0.253 H, goblin 0.126 H, truck 2.375× / 4.875×, torii 3.625×), font audit: nothing under 28 px. Truck freeze measured 950 ms (983 ms while recording).
+
+**Test matrix, 10,000 cells × 12 µs (5 runs × 3 rounds; rank counts):**
+
+| Condition | Round 1 | Round 2 | Round 3 |
+|---|---|---|---|
+| a · normal 1920×1080 | C ×5 (QUEST FAILED 5/5) | **S ×5** | S ×5 |
+| b · recording | C ×5 (5/5) | **S ×5** | S ×5 |
+| c · CPU 2× | C ×5 (5/5) | **S ×5** | S ×2, B ×3 |
+| c · CPU 4× | C ×5 (5/5) | A ×2, B ×3 | A ×1, B ×4 |
+| d · DPR 1 | C ×5 (5/5) | S ×5 | S ×5 |
+| d · DPR 2 | C ×5 (5/5) | S ×4, B ×1 | S ×5 |
+
+**Calibrated for 4× (K, headless, 8.5 min):** 10,000 × 12 → R2 B×5 (render 182 ms: C11) · 6,400 × 12 → R2 S×3 A×2 · **3,600 × 12 → R1 C×5, R2 S×5, R3 S×5**. Re-test at 3,600 × 12: 4× → R1 C×4 B×1, R2 S×5, R3 S×3 A×2; normal speed → R1 C×2 B×3 (too smooth: this setting is only for a slow machine, which is why calibration runs on the stage laptop).
