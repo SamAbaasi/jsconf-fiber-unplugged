@@ -27,7 +27,11 @@
 .boss-hydra { position: absolute; transform-origin: 50% 100%; transition: transform 1.2s ease-in, opacity 1.2s ease-in; }
 .boss-hydra { transform-origin: 85% 100%; }
 /* The dragon falls over (it did render): no fade. */
-.boss-hydra.is-collapsed { transform-origin: 50% 50%; transform: scaleY(-1); } /* on its back, feet up */
+.boss-hydra { clip-path: inset(-400px -400px 0 -400px); } /* nothing below the ground line */
+/* The dragon falls (it did render): it sinks onto its belly, legs below the grass, head down. */
+.dragon-scale { transform-origin: 92% 100%; transition: transform 900ms ease-in, filter 900ms; }
+.boss-hydra.is-collapsed .dragon-scale { transform: translateY(150px) rotate(-7deg); filter: brightness(0.75); }
+.boss-hydra.no-anim, .boss-hydra.no-anim * { transition: none !important; }
 .boss-arena.is-result .hud { opacity: 0; }
 /* QUEST FAILED: the world and the dragon turn grey; the village fire (fx canvas) keeps its colour. */
 .boss-arena.is-grey .boss-layer:not(.boss-fx), .boss-arena.is-grey .boss-hydra { filter: grayscale(0.9) brightness(0.8); transition: filter 600ms; }

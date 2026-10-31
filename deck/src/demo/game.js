@@ -77,18 +77,25 @@ const RETURN_MS = 150;
 const IMPACT_AT = DASH_MS + Math.round(SLASH_MS * ((CONTACT_ANGLE + 2.3) / 3.3));
 const WHITE_GOBLIN = Object.fromEntries(Object.entries(GOBLIN_PALETTE).map(([k]) => [k, '#ffffff']));
 
-// The village = your UI. Three houses on the ×12 grid, two windows each: six windows,
-// one per allowed bite. The sixth bite (more than questFailBites) makes it fall.
+// The village = your UI: a small castle on the ×12 grid (two towers, a wall, a gate), with six
+// lit windows, one per allowed bite. The sixth bite (more than questFailBites) makes it fall.
 const PX = 12;
-const HOUSES = [12, 92, 172].map((x) => ({ x, w: 6 * PX }));
-const WINDOWS = HOUSES.length * 2;
-const HOUSE_TOP = ARENA.groundY - 5 * PX; // wall top
-const ROOF_TOP = HOUSE_TOP - 3 * PX;
-// Two windows stacked on the left, the door on the right: no "face" layout.
+const TOWERS = [12, 180]; // x of the two towers, 6 PX wide
+const TOWER_TOP = ARENA.groundY - 11 * PX;
+const WALL = { x: 84, w: 8 * PX, top: ARENA.groundY - 6 * PX };
+const WINDOWS = 6;
+const ROOF_TOP = TOWER_TOP; // highest stone (kept for the text positions)
+// Where goblins stand once they got in, and where the fire burns: the two tower tops and the wall.
+const PERCHES = [
+  { cx: TOWERS[0] + 3 * PX, top: TOWER_TOP - PX },
+  { cx: WALL.x + WALL.w / 2, top: WALL.top - PX },
+  { cx: TOWERS[1] + 3 * PX, top: TOWER_TOP - PX },
+];
+// Windows: three per tower, filled in order left, right, left, right…
 const windowRect = (i) => {
-  const h = HOUSES[i % HOUSES.length];
-  const k = Math.floor(i / HOUSES.length);
-  return { x: h.x + PX, y: HOUSE_TOP + (k ? 3 : 1) * PX, w: 2 * PX, h: PX };
+  const t = TOWERS[i % 2];
+  const k = Math.floor(i / 2);
+  return { x: t + 2 * PX, y: TOWER_TOP + (1 + k * 3) * PX, w: 2 * PX, h: 2 * PX };
 };
 
 // A small log of landed hits, so tests can find the frames where contact happens.
@@ -209,10 +216,9 @@ export function createGame(els) {
     Object.assign(g, freshRound());
     if (els.hydra) {
       // Snap back without the fall transition (otherwise the legs sink into the grass).
-      els.hydra.style.transition = 'none';
-      els.hydra.className = `boss-hydra ${g.form.cls}`;
+      els.hydra.className = `boss-hydra no-anim ${g.form.cls}`;
       void els.hydra.offsetWidth;
-      els.hydra.style.transition = '';
+      els.hydra.classList.remove('no-anim');
     }
     if (els.dragonKb) els.dragonKb.style.transform = '';
     if (els.arena) {
@@ -465,7 +471,7 @@ export function createGame(els) {
         // After biting, it climbs onto a roof and stays there (one per house), or vanishes.
         if (gb.state === 'bite' && now - gb.t0 >= 360) {
           const onRoofs = g.goblins.filter((x) => x.state === 'roof').length;
-          if (onRoofs < HOUSES.length) {
+          if (onRoofs < PERCHES.length) {
             gb.state = 'roof';
             gb.house = onRoofs;
           } else {
@@ -605,7 +611,7 @@ export function createGame(els) {
       g.headLog.slice(-2).forEach((h, i, list) => {
         const age = (now - h.t0) / 1300;
         ctx.globalAlpha = 1 - age * age;
-        const y = ROOF_TOP - 130 - (list.length - 1 - i) * 46;
+        const y = ROOF_TOP - 150 - (list.length - 1 - i) * 46;
         ctx.fillStyle = '#05071a';
         ctx.fillText(h.text, 172, y + 4);
         ctx.fillStyle = h.color;
@@ -630,47 +636,60 @@ export function createGame(els) {
     },
   };
 
-  // ---------- the village (your UI) ----------
+  // ---------- the village (your UI): a small castle ----------
   function drawVillage(ctx, now) {
     const fallen = g.bites > RULES.questFailBites;
-    for (let h = 0; h < HOUSES.length; h++) {
-      const { x, w } = HOUSES[h];
-      // roof: three stepped rows on the 12 px grid
-      ctx.fillStyle = '#8a3a3a';
-      ctx.fillRect(x + 2 * PX, ROOF_TOP, 2 * PX, PX);
-      ctx.fillRect(x + PX, ROOF_TOP + PX, 4 * PX, PX);
-      ctx.fillRect(x, ROOF_TOP + 2 * PX, w, PX);
-      // walls and door
-      ctx.fillStyle = '#c9a27a';
-      ctx.fillRect(x, HOUSE_TOP, w, ARENA.groundY - HOUSE_TOP);
-      ctx.fillStyle = '#5c3a2e';
-      ctx.fillRect(x + 4 * PX, HOUSE_TOP + 2 * PX, PX, 3 * PX);
+    const stone = '#7a74ad';
+    const light = '#9a94cc';
+    const shade = '#565088';
+    // wall with crenellations and a gate
+    ctx.fillStyle = stone;
+    ctx.fillRect(WALL.x, WALL.top, WALL.w, ARENA.groundY - WALL.top);
+    ctx.fillStyle = light;
+    for (let k = 0; k < WALL.w / PX; k += 2) ctx.fillRect(WALL.x + k * PX, WALL.top - PX, PX, PX);
+    ctx.fillStyle = shade;
+    ctx.fillRect(WALL.x, WALL.top + 2 * PX, WALL.w, PX / 2);
+    ctx.fillStyle = '#1a1430';
+    ctx.fillRect(WALL.x + 2 * PX, ARENA.groundY - 3 * PX, 4 * PX, 3 * PX);
+    ctx.fillRect(WALL.x + 3 * PX, ARENA.groundY - 4 * PX, 2 * PX, PX);
+    // towers with crenellations and a flag
+    for (const tx of TOWERS) {
+      ctx.fillStyle = stone;
+      ctx.fillRect(tx, TOWER_TOP, 6 * PX, ARENA.groundY - TOWER_TOP);
+      ctx.fillStyle = shade;
+      ctx.fillRect(tx + 5 * PX, TOWER_TOP, PX, ARENA.groundY - TOWER_TOP);
+      ctx.fillStyle = light;
+      for (let k = 0; k < 6; k += 2) ctx.fillRect(tx + k * PX, TOWER_TOP - PX, PX, PX);
+    }
+    if (!fallen) {
+      ctx.fillStyle = '#8a5a2b';
+      ctx.fillRect(TOWERS[0] + 3 * PX, TOWER_TOP - 5 * PX, PX / 2, 4 * PX);
+      ctx.fillStyle = '#34e0a1';
+      ctx.fillRect(TOWERS[0] + 3.5 * PX, TOWER_TOP - 5 * PX, 2 * PX, PX + (Math.floor(now / 300) % 2) * 4);
     }
     for (let i = 0; i < WINDOWS; i++) {
       const wr = windowRect(i);
       ctx.fillStyle = i < g.darkWindows ? '#1a1430' : '#ffd166';
       ctx.fillRect(wr.x, wr.y, wr.w, wr.h);
     }
-    // Label, once: what the village stands for (on the grass, never covered).
+    // Label, once: what the castle stands for (on the grass, never covered).
     ctx.font = '32px DotGothic16';
     ctx.fillStyle = '#05071a';
-    ctx.fillText('your UI', 128, ARENA.groundY + 34 + 3);
+    ctx.fillText('your UI', 134, ARENA.groundY + 34 + 3);
     ctx.fillStyle = fallen ? '#ff5d73' : '#ffffff';
-    ctx.fillText('your UI', 126, ARENA.groundY + 34);
+    ctx.fillText('your UI', 132, ARENA.groundY + 34);
   }
 
-  // The village falls: fire on every roof, from the moment it falls until the round is reset.
-  // Drawn after the goblins, so the dancing goblins never hide it.
+  // The castle falls: fire on the towers and the wall, from the moment it falls until the reset.
+  // Drawn after the goblins, so the goblins never hide it.
   function drawVillageFire(ctx, now) {
-    if (g.bites > RULES.questFailBites) {
-      for (let h = 0; h < HOUSES.length; h++) {
-        const { x } = HOUSES[h];
-        for (let k = 0; k < 4; k++) {
-          const flick = Math.floor(now / 90 + k * 1.7 + h) % 3;
-          ctx.fillStyle = flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
-          ctx.fillRect(x + 6 + k * 16, ROOF_TOP + PX - flick * 8, PX, 2 * PX + flick * 8);
-          ctx.fillRect(x + 12 + k * 14, HOUSE_TOP - flick * 6, PX, PX);
-        }
+    if (g.bites <= RULES.questFailBites) return;
+    for (let p = 0; p < PERCHES.length; p++) {
+      const { cx, top } = PERCHES[p];
+      for (let k = 0; k < 5; k++) {
+        const flick = Math.floor(now / 90 + k * 1.7 + p) % 3;
+        ctx.fillStyle = flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
+        ctx.fillRect(cx - 30 + k * 12, top - flick * 8 - (k % 2) * 10, PX, 2 * PX + flick * 8);
       }
     }
   }
@@ -691,10 +710,10 @@ export function createGame(els) {
         x = GOBLIN_SLOTS[0] + (w.x - GOBLIN_W / 2 - GOBLIN_SLOTS[0]) * p;
       }
       if (gb.state === 'roof') {
-        // Dancing on a roof.
-        const h = HOUSES[gb.house];
-        x = h.x + (h.w - GOBLIN_W) / 2;
-        y = ROOF_TOP + PX - GOBLIN_W - Math.abs(Math.sin(now / 140 + gb.house)) * 14;
+        // Dancing on the battlements.
+        const p = PERCHES[gb.house];
+        x = p.cx - GOBLIN_W / 2;
+        y = p.top + PX - GOBLIN_W - Math.abs(Math.sin(now / 140 + gb.house)) * 14;
       }
       if (gb.state === 'dying') {
         const t = now - gb.t0;
@@ -813,11 +832,11 @@ export function createGame(els) {
       grad.addColorStop(1, 'rgba(255, 120, 40, 0.15)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, ARENA.w, ARENA.groundY);
-      for (let h = 0; h < HOUSES.length; h++) {
+      for (let h = 0; h < PERCHES.length; h++) {
         for (let k = 0; k < 7; k++) {
           const t = ((now / 18 + k * 60 + h * 37) % 420) / 420;
           ctx.fillStyle = `rgba(40, 32, 48, ${0.7 * (1 - t)})`;
-          const sx = HOUSES[h].x + 24 + Math.sin(t * 6 + h) * 18 + t * 60;
+          const sx = PERCHES[h].cx - 12 + Math.sin(t * 6 + h) * 18 + t * 60;
           ctx.fillRect(Math.round(sx / PX) * PX, Math.round((ROOF_TOP - 24 - t * 420) / PX) * PX, 2 * PX, 2 * PX);
         }
       }

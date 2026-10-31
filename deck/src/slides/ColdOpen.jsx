@@ -4,7 +4,7 @@ import { Dialogue } from '../ui/Dialogue.jsx';
 import { LINES } from '../content/lines.js';
 import { spriteCanvas } from '../ui/Sprite.jsx';
 import { TRUCK, TRUCK_PALETTE, TRUCK_LABEL_BOX } from '../sprites/truck.js';
-import { FIBER_KUN, PALETTE, DEV, DEV_PALETTE, LAPTOP, COFFEE } from '../sprites/fiberkun.js';
+import { FIBER_KUN, PALETTE, DEV, DEV_PALETTE, BAG, COFFEE } from '../sprites/fiberkun.js';
 import { TORII, TORII_PALETTE } from '../sprites/torii.js';
 import { TEHRAN_FA } from '../sprites/tehranSign.js';
 import { drawSword } from '../sprites/sword.js';
@@ -310,14 +310,14 @@ function drawBonk(g, x, y) {
   g.fillText('BONK!', x, y - 96);
 }
 
-// The developer (previous life): an open laptop in front of him, a coffee in the other hand.
+// The developer (previous life): a shoulder bag at his side, a coffee in the other hand.
 function drawDev(g, x, ts) {
   const img = spriteCanvas(DEV[Math.floor(ts / 600) % 2], DEV_PALETTE, S);
   const y = GROUND - img.height;
-  const lap = spriteCanvas(LAPTOP, DEV_PALETTE, S);
+  const bag = spriteCanvas(BAG, DEV_PALETTE, S);
   const cup = spriteCanvas(COFFEE, DEV_PALETTE, S);
   g.drawImage(img, x, y);
-  g.drawImage(lap, x - 3 * S, y + 7 * S); // open laptop held in front, screen glowing
+  g.drawImage(bag, x - 5 * S, y + 6 * S); // shoulder bag at his side
   g.drawImage(cup, x + 13 * S, y + 7 * S);
   const b = bbox(DEV[0]);
   reportBox('cold-open', 'previous-life', { x: x + b.x * S, y: y + b.y * S, w: b.w * S, h: b.h * S });

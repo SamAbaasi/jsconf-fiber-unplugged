@@ -186,7 +186,7 @@ const report = { url, states: [], fontAudit: [], wordsOver40: [], dialogueClick:
     }
 
     if (isBoss) {
-      const mode = (await page.locator('.boss-mode.is-on').innerText()).trim();
+      const mode = `round ${Number(step) / 2 + 1} · ${(await page.locator('.boss-code-line').innerText()).trim()}`;
       const r = await playRound(page, mode, { shot: path.join(outDir, `${name}-fight.png`), jumpAt: step === '0' ? 1800 : null });
       report.rounds.push(r);
       // After the fight: goblins were drawn. Keep the dragon size from before the fight

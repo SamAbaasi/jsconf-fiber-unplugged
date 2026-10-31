@@ -7,7 +7,7 @@ import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { scaleReport, SCALES, bbox } from '../src/sprites/scale.js';
-import { FIBER_KUN, DEV, LAPTOP, COFFEE, PALETTE } from '../src/sprites/fiberkun.js';
+import { FIBER_KUN, DEV, BAG, COFFEE, PALETTE } from '../src/sprites/fiberkun.js';
 import { GOBLIN, GOBLIN_PALETTE } from '../src/sprites/goblin.js';
 import { TRUCK, TRUCK_PALETTE } from '../src/sprites/truck.js';
 import { TORII, TORII_PALETTE } from '../src/sprites/torii.js';
@@ -38,7 +38,7 @@ if (process.argv.includes('--lineup')) {
     { group: 'boss', label: `Fiber-kun ×${SCALES.boss.hero}`, frame: FIBER_KUN.idle[0], pal: PALETTE, scale: SCALES.boss.hero },
     { group: 'boss', label: `dragon ${SCALES.boss.dragonH} px`, dragon: { cols: d.cols, rows: d.rows, shape: d.shape }, scale: dragonCell },
   ].map((it) => (it.frame ? { ...it, box: bbox(it.frame) } : it));
-  const props = { laptop: LAPTOP, coffee: COFFEE, pal: PALETTE };
+  const props = { laptop: BAG, coffee: COFFEE, pal: PALETTE };
   const html = `<!doctype html><html><body style="margin:0;background:#0b0c2e"><canvas id=c width=3500 height=1000></canvas><script>
   const items = ${JSON.stringify(items)}; const props = ${JSON.stringify(props)}; const H = ${SCALES.boss.arenaH};
   const DRAGON_COLORS = ['', '#6b5bd1','#ffd166','#3b2f8f','#9a8cf0','#120c2c','#ffffff','#4a3f9a','#c9c3e8','#ffd166'];
