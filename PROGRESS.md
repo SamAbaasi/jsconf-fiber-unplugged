@@ -75,3 +75,30 @@
 - While the screen recorder runs, rounds 2–3 get slower (worst frame 45–62 ms, rank A, once TIME UP with 1 hit). The game showed that truthfully.
 
 **Claims**: none added or dropped. Three IDs in the brief did not match CLAIMS.md: VIP pass = **C2** (not C5), Header = **H3** (not H2), the 4th correction = **C10**/A4 (not B3). I used the correct IDs.
+
+## Phase 2.6: polish the game (2026-10-31)
+
+**Fixed**
+1. **Rank luck:** every frame > 50 ms during a round is now a hit, for its real length. A K.O. caps the rank at C. The rule is shown before each round.
+2. **Longer fights:** auto-type covers five words (~6 s); a round lasts up to 8 s. Round 2/3 WIN at ~6.0 s.
+3. **Truck scene:** the truck is hidden until it drives in; the road dashes sit above the dialogue box.
+4. **A visible freeze:** the impact runs a real `flushSync` render of 5,000 components (~300 µs each). Measured frozen frame: 1,183–1,367 ms (target ~1.5 s; the number shown is the measured one). The fps counter is labelled "(last 1 s)" and drops and recovers truthfully.
+5. **Hero:** Fiber-kun is 192 px (was ~110). JANK numbers are a fixed 4-line hit log, so they no longer overlap.
+6. **Patch notes:** a 5th entry, **Part 1 line 100** "pause … then resume" → restart from root (new CLAIMS row **B6**). The brief said "B3, Part 2", but Part 2 lines 124/128 describe pause/resume vs abort correctly; the error is in Part 1. B3 is the "Default doesn't interrupt" rule.
+
+**New**
+- **A:** Tehran at night (generic mountains and buildings), an original generic engineer avatar (short dark hair, blue hoodie, laptop: placeholders for Saman to approve), "I was a frontend engineer in Tehran…", BONK! (cartoon), white flash → Fiber-kun.
+- **B:** rAF jump physics (no frames → no movement); auto-jump over decor fireballs; **↑** jumps (handled on window in capture phase, so the slide doesn't change) and shows `input delay` when > 50 ms (75–133 ms in Round 1 runs; once 12 ms when the key landed between long frames).
+- **C:** sword: render attempt → wind-up, commit → slash + cut marks on the matched body cells, thrown-away render → cancelled slash + RESPAWN AT ROOT.
+- **D:** same workload in all rounds ("same work: 10,000 fibers × 12 µs" in the top bar); three looks: JANK HYDRA / FROST (horns) / SHADOW (crowns).
+- **E:** result screens per rank: PERFECT (gold, fanfare, raised sword, the Hydra collapses), GREAT!, CLEAR, GAME OVER (grey, Fiber-kun down, CONTINUE? countdown, the Hydra laughs). The READY/result panel now covers the instrument column, so the arena stays visible.
+
+**Rank stability** (headless Chromium, cloud container, no GPU, production build; runs without the screen recorder):
+
+| Round | Runs | Ranks | Notes |
+|---|---|---|---|
+| 1 · no transition | 8 | **C ×8** | always TIME UP, ~30 hits, worst 159–201 ms, ~4,100 damage of 5,000 HP (no K.O. here) |
+| 2 · useTransition | 12 | **S ×11, A ×1** | 0 hits in 11 runs; the A was one 51 ms frame |
+| 3 · useDeferredValue | 12 | **S ×8, A ×3, B ×1** | the misses were single 59–91 ms frames |
+
+Runs = the 5-run `--stability` test + 3 walk-through runs (round 1) / 3 walk-through + 4 fresh-page runs (rounds 2–3). A fresh page did not help round 3 (S ×3, A ×1), so it is not garbage from earlier rounds. The long frames are probably commits repainting thousands of cells without a GPU. With the screen recorder running, rounds 2–3 drop to A or B with TIME UP (~40 fps); the recordings show that truthfully.

@@ -16,18 +16,18 @@ export const LINES = {
     sub: '(When I woke up…)',
     claims: [],
   },
-  truckHappy: {
-    by: 'draft',
-    speaker: 'SYSTEM',
+  tehran: {
+    by: 'saman',
+    speaker: 'Saman',
     face: null,
-    text: 'A happy UI. Every frame on time.',
+    text: 'I was a frontend engineer in Tehran…',
     claims: [],
   },
   truckAfter: {
     by: 'draft',
     speaker: 'SYSTEM',
     face: null,
-    text: 'One long task. No frames. No input. Nothing.',
+    text: 'One long task. Everything stops. No frames. No input.',
     claims: ['A1'],
   },
   wakeUp: {
@@ -53,13 +53,15 @@ export const LINES = {
   patchTitle: { by: 'saman', text: 'PATCH NOTES v1.1', claims: [] },
   patchSub: { by: 'saman', text: 'bugs in my own articles', claims: [] },
   patch1Old: { by: 'draft', text: 'startTransition(() => setResults(filter(query)))', claims: ['E1', 'E2'] },
-  patch1New: { by: 'draft', text: 'callback runs now', claims: ['E1'] },
-  patch2Old: { by: 'draft', text: 'useEffect: always after paint', claims: ['G2'] },
+  patch1New: { by: 'draft', text: 'runs now', claims: ['E1'] },
+  patch2Old: { by: 'draft', text: 'useEffect: after paint', claims: ['G2'] },
   patch2New: { by: 'draft', text: 'click → before paint', claims: ['G2'] },
   patch3Old: { by: 'draft', text: 'Header re-renders', claims: ['H3'] },
-  patch3New: { by: 'draft', text: 'only CartIcon runs', claims: ['H2', 'H3'] },
+  patch3New: { by: 'draft', text: 'only CartIcon', claims: ['H2', 'H3'] },
   patch4Old: { by: 'draft', text: '5 ms per task', claims: ['C10'] },
-  patch4New: { by: 'draft', text: 'per browser task, non-urgent only', claims: ['C5', 'C10', 'A4'] },
+  patch5Old: { by: 'draft', text: 'keystroke: pause, then resume', claims: ['B6'] },
+  patch5New: { by: 'draft', text: 'restart from root', claims: ['B1', 'B2', 'B6'] },
+  patch4New: { by: 'draft', text: 'browser task, non-urgent', claims: ['C5', 'C10', 'A4'] },
 
   // Boss fight result screen. Shown only when the real result matches.
   resultWinYield: { by: 'draft', text: '外れスキル? No. 《Yield》 won this fight.', lang: 'ja-mixed', claims: ['A2', 'A4', 'B1'] },

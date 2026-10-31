@@ -35,17 +35,17 @@ PageUp/PageDown (clicker) always work, even while the demo input has focus. **Es
 
 A click while a dialogue line is still typing finishes the line (it does not move on).
 
-Boss-fight slide (live demo): **I** focus the input · **A** auto-type · **C** clear · **R** restart the round · **[ ]** less/more work per cell.
+Boss-fight slide (live demo): **I** focus the input · **A** auto-type · **↑** jump · **C** clear · **R** restart the round · **[ ]** less/more work per cell.
 
 ## Slides so far (Phase 2.5)
 
 1. Cold open: black screen, 「目が覚めたら…」
-2. Truck-kun, **live**: the truck's impact runs a real `flushSync` render; the frozen frame is measured
+2. Truck-kun, **live**: Tehran at night, a frontend engineer → the truck's impact runs a real ~1.5 s `flushSync` render; the frozen frame is measured → white flash → Fiber-kun
 3. Title
 4. STATUS window: fields, twin, lanes, SKILLS (外れスキル?, 封印)
 5. Skill: Yield: skill card → loop code → tree walk narrated in a dialogue box → summary
 6. Boss fight, **live**: JANK HYDRA, three rounds (sync / useTransition / useDeferredValue)
-7. Patch notes: the four corrections to my articles
+7. Patch notes: the five corrections to my articles
 
 On-screen lines live in `src/content/lines.js`, each marked `by: 'saman'` or `by: 'draft'`.
 
@@ -53,27 +53,16 @@ On-screen lines live in `src/content/lines.js`, each marked `by: 'saman'` or `by
 
 Fixed in `src/demo/game.js` (`RULES`, `rankOf`) and shown on screen before every round:
 
-- A round lasts 3 s from the first keystroke. The Hydra attacks every 300 ms (wall clock).
-- An attack is resolved in the animation frame that contains its time. If that frame is **longer than 50 ms**, Fiber-kun is hit for the frame's real length in ms. Otherwise he dodges.
-- Every frame that is not longer than 50 ms deals 1 damage to the Hydra (HP 120). Fiber-kun has HP 500.
+- A round lasts up to 8 s from the first keystroke. **A** auto-types five words (~6 s).
+- **Every** animation frame longer than **50 ms** is a hit ("the Hydra strikes whenever you freeze"). The damage is that frame's real length in ms. Fiber-kun has HP 5000.
+- Every other frame deals 1 damage to the Hydra (HP 360, which is 6 s at 60 fps).
 - K.O. at HP 0, WIN when the Hydra reaches 0, otherwise TIME UP.
-- Rank: **S** 0 hits and worst frame ≤ 50 ms · **A** ≤ 1 hit and worst ≤ 100 ms · **B** ≤ 3 hits · **C** more.
-- "RESPAWN AT ROOT" and the RESPAWN counter appear only for a real thrown-away render (the list started a new render attempt before its last one committed).
+- Rank: **S** 0 hits · **A** 1–2 · **B** 3–5 · **C** 6+ or K.O. Result screens: S = PERFECT (fanfare, raised sword, the Hydra collapses) · A = GREAT! · B = CLEAR · C = GAME OVER (grey, CONTINUE? countdown, the Hydra laughs).
+- Sword: each **commit** of the list = a slash that lands (cut marks on the cells that commit matched). Each **thrown-away** render = a cancelled slash + "RESPAWN AT ROOT".
+- **↑** = jump (also automatic over fireballs). Jumps are rAF physics: during a long frame nothing moves. The ↑ handler shows `input delay = performance.now() − event.timeStamp` when it is over 50 ms.
+- Same workload every round (10,000 fibers × the same µs); only the Hydra's look changes (JANK HYDRA, FROST, SHADOW).
 
 No randomness anywhere. All game effects run in the monitor's `requestAnimationFrame` loop, outside React.
-
-## How the live demo is measured
-
-- `vite.config.js` aliases the bare import `scheduler` to `src/instrument/scheduler-wrapper.js`.
-  react-dom's `require("scheduler")` gets the wrapper, which forwards every call to the real
-  `scheduler@0.28.0` and records when each task starts, yields and ends. `shouldYield`, the 5 ms slice
-  and the priorities are untouched.
-- The demo list records when a render attempt starts (its function runs) and when it commits
-  (its layout effect). If a new attempt starts before the last one committed, React threw the last one away.
-- FPS, frames and the world animation run in one `requestAnimationFrame` loop, outside React.
-  They freeze when the main thread is blocked, which is the point.
-- Each of the 10,000 cells does about 12 µs of real arithmetic, calibrated at startup so the
-  render costs about the same on any laptop.
 
 ## Checks
 
@@ -89,6 +78,7 @@ npm run build && npm run check
   requests blocked**, walks every slide and step, audits font sizes (< 28 px) and words (> 40 outside the boss
   slide), tests that a click finishes a typing line, plays the three boss rounds and reads the result screens,
   and tests the presenter link. It fails on any request or console error. Add `-- --record` to also record the
-  three rounds to `.check/boss-rounds.webm`. Output goes to `.check/`.
+  truck scene and the three rounds (`truck.webm`, `boss-rounds.webm`), and `-- --stability 5` to replay the three
+  rounds five more times. Output goes to `.check/`.
 
 The built page also carries a Content-Security-Policy with `connect-src 'none'`.

@@ -7,7 +7,8 @@
 // Fails if any request leaves file:/data:/blob:, or if any page logs an error or warning.
 //
 // Usage: npm run build && npm run check [-- --out <dir>] [-- --headed] [-- --record]
-//   --record   also records the three boss rounds to <out>/boss-rounds.webm (separate run)
+//   --record        also records the truck scene and the three boss rounds (truck.webm, boss-rounds.webm)
+//   --stability N   replays the three boss rounds N more times and reports every result
 import { createRequire } from 'node:module';
 import { mkdirSync, writeFileSync, readdirSync, renameSync } from 'node:fs';
 import path from 'node:path';
@@ -95,15 +96,20 @@ async function waitForState(page) {
   return page.waitForTimeout(700);
 }
 
-async function playRound(page, label, shot = null) {
+// Plays one round with auto-type. Options: shot = screenshot mid-fight; jumpAt = press ↑ after this many ms.
+async function playRound(page, label, { shot = null, jumpAt = null } = {}) {
   await page.keyboard.press('r');
   await page.waitForTimeout(600);
   await page.keyboard.press('a');
+  if (jumpAt !== null) {
+    await page.waitForTimeout(jumpAt);
+    await page.keyboard.press('ArrowUp');
+  }
   if (shot) {
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(500);
     await page.screenshot({ path: shot });
   }
-  await page.locator('.boss-overlay.is-result').waitFor({ timeout: 10000 });
+  await page.locator('.boss-overlay.is-result').waitFor({ timeout: 20000 });
   await page.waitForTimeout(400);
   const result = JSON.parse(await page.locator('.boss-overlay').getAttribute('data-result'));
   const fps = await page.locator('.boss-fps-num').innerText();
@@ -154,7 +160,7 @@ const report = { url, states: [], fontAudit: [], wordsOver40: [], dialogueClick:
 
     if (isBoss) {
       const mode = (await page.locator('.boss-mode.is-on').innerText()).trim();
-      const r = await playRound(page, mode, path.join(outDir, `${name}-fight.png`));
+      const r = await playRound(page, mode, { shot: path.join(outDir, `${name}-fight.png`), jumpAt: step === '0' ? 1800 : null });
       report.rounds.push(r);
       await page.screenshot({ path: path.join(outDir, `${name}-result.png`) });
       await page.keyboard.press('c');
@@ -182,8 +188,53 @@ const report = { url, states: [], fontAudit: [], wordsOver40: [], dialogueClick:
   await context.close();
 }
 
-// ---------- optional: record the three boss rounds ----------
+// ---------- optional: replay the three rounds N times, for the rank distribution ----------
+const stabilityRuns = args.includes('--stability') ? Number(args[args.indexOf('--stability') + 1]) : 0;
+if (stabilityRuns > 0) {
+  const context = await newContext();
+  const page = await context.newPage();
+  watch(page, 'stability');
+  report.stability = [];
+  for (let run = 1; run <= stabilityRuns; run++) {
+    await page.goto(`${url}#/6/0`);
+    await page.reload();
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(1500);
+    for (let step = 0; step < 3; step++) {
+      if (step > 0) {
+        await page.keyboard.press('PageDown');
+        await page.waitForTimeout(1500);
+      }
+      const r = await playRound(page, `run ${run} · round ${step + 1}`);
+      report.stability.push(r);
+      console.error(`${r.label}: ${r.outcome} rank ${r.rank} hits ${r.hits} worst ${r.worstFrameMs} ms fps ${r.avgFps} thrown ${r.thrownAway}`);
+      await page.waitForTimeout(1200);
+    }
+  }
+  await context.close();
+}
+
+// ---------- optional: record the truck scene and the three boss rounds ----------
 if (args.includes('--record')) {
+  {
+    const videoDir = path.join(outDir, 'video-truck');
+    mkdirSync(videoDir, { recursive: true });
+    const context = await newContext({ recordVideo: { dir: videoDir, size: { width: 1280, height: 720 } } });
+    const page = await context.newPage();
+    watch(page, 'record-truck');
+    await page.goto(`${url}#/2/0`);
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(3000);
+    await page.keyboard.press('PageDown');
+    await page.locator('.truck-frozen').waitFor({ timeout: 10000 });
+    report.recordedTruckFrozenMs = await page.locator('.truck-frozen b').innerText();
+    await page.waitForTimeout(3500);
+    await page.keyboard.press('PageDown');
+    await page.waitForTimeout(3500);
+    await context.close();
+    const file = readdirSync(videoDir).find((f) => f.endsWith('.webm'));
+    if (file) renameSync(path.join(videoDir, file), path.join(outDir, 'truck.webm'));
+  }
   const videoDir = path.join(outDir, 'video-tmp');
   mkdirSync(videoDir, { recursive: true });
   const context = await newContext({ recordVideo: { dir: videoDir, size: { width: 1280, height: 720 } } });
@@ -199,7 +250,8 @@ if (args.includes('--record')) {
       await page.keyboard.press('PageDown');
       await page.waitForTimeout(1500);
     }
-    report.recordedRounds.push(await playRound(page, `round ${step + 1} (while recording)`));
+    // Round 1: press ↑ during the fight, so the late jump and its input delay are on video.
+    report.recordedRounds.push(await playRound(page, `round ${step + 1} (while recording)`, { jumpAt: step === 0 ? 2000 : null }));
     await page.waitForTimeout(2500);
   }
   await context.close();
