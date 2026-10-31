@@ -1,0 +1,112 @@
+.boss { position: absolute; inset: 0; }
+
+.boss-top {
+  position: absolute;
+  left: 40px;
+  right: 40px;
+  top: 22px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+.boss-title { font-size: 52px; color: var(--rank-a); text-shadow: 4px 4px 0 #000; }
+.boss-modes { display: flex; gap: 14px; }
+.boss-mode {
+  font-size: 26px;
+  padding: 6px 16px;
+  border: 3px solid var(--dim);
+  border-radius: 10px;
+  color: var(--dim);
+}
+.boss-mode-n { opacity: 0.7; }
+.boss-mode.is-on.rank-S { color: #1b1300; background: var(--rank-s); border-color: var(--rank-s); }
+.boss-mode.is-on.rank-D { color: #00140c; background: var(--rank-d); border-color: var(--rank-d); }
+
+.boss-world {
+  position: absolute;
+  left: 40px;
+  top: 116px;
+  width: 1000px;
+  height: 250px;
+  border: 4px solid var(--win-line);
+  border-radius: 12px;
+  box-shadow: 0 0 0 4px var(--win-edge);
+}
+
+.boss-input {
+  position: absolute;
+  left: 40px;
+  top: 392px;
+  width: 1000px;
+  height: 118px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 28px;
+}
+.boss-input-label { font-size: 36px; color: var(--rank-s); white-space: nowrap; }
+.boss-input-field {
+  flex: 1;
+  min-width: 0;
+  font: 48px var(--font-code);
+  color: var(--ink);
+  background: #070b26;
+  border: 3px solid var(--muted);
+  border-radius: 8px;
+  padding: 4px 16px;
+  outline: none;
+}
+.boss-input-field:focus { border-color: var(--rank-s); }
+.boss-pending { width: 190px; font-size: 30px; color: var(--rank-d); }
+
+.boss-hydra {
+  position: absolute;
+  left: 40px;
+  top: 528px;
+  width: 1000px;
+  height: 530px;
+}
+.boss-hydra.is-pending .hydra-grid { opacity: 0.55; }
+.hydra { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.hydra-hp { font-size: 26px; color: var(--muted); }
+.hydra-hp b { color: var(--rank-d); }
+.hydra-grid {
+  display: grid;
+  grid-template-columns: repeat(125, 6px);
+  grid-auto-rows: 6px;
+  width: 756px;
+  height: 486px;
+  border: 3px solid #283270;
+  /* Keep the commit's style and paint work inside the grid. */
+  contain: strict;
+}
+.hydra-grid i { display: block; }
+.hydra-grid .c0 { background: #0a0e2b; }
+.hydra-grid .c1 { background: #4a3a8f; }
+.hydra-grid .c2 { background: #ff5d73; }
+.hydra-grid .h1 { background: #7dffc8; }
+.hydra-grid .h0 { background: #2f8f6b; }
+
+.boss-fps { left: 1080px; top: 116px; width: 800px; height: 200px; display: grid; grid-template-columns: 220px 1fr; align-items: center; padding: 20px 28px; }
+.boss-fps-num { font-size: 104px; line-height: 1; text-align: center; color: var(--rank-d); }
+.boss-fps-num[data-level='warn'] { color: var(--rank-s); }
+.boss-fps-num[data-level='bad'] { color: var(--rank-a); }
+.boss-fps-graph { width: 480px; height: 110px; border: 2px solid #283270; }
+.boss-fps-worst { grid-column: 1 / -1; font-size: 24px; margin-top: 4px; color: var(--muted); }
+.boss-fps-worst b { color: var(--ink); }
+
+.boss-timeline { left: 1080px; top: 348px; width: 800px; height: 392px; padding: 22px 16px 12px; }
+.boss-timeline canvas { display: block; width: 760px; height: 300px; }
+.boss-legend { display: flex; gap: 18px; margin-top: 8px; font-size: 18px; color: var(--muted); }
+.lg::before { content: ''; display: inline-block; width: 18px; height: 14px; margin-right: 6px; vertical-align: -1px; }
+.lg-s::before { background: var(--rank-s); }
+.lg-d::before { background: var(--rank-d); }
+.lg-x::before { background: rgba(255, 93, 115, 0.5); border: 2px solid var(--rank-a); }
+.lg-r::before { background: var(--rank-a); }
+
+.boss-code { left: 1080px; top: 772px; width: 800px; height: 268px; padding: 24px 28px 16px; }
+.boss-code-pre { margin: 0; font-size: 23px; line-height: 1.32; color: #dfe4ff; white-space: pre; }
+.boss-stats { position: absolute; left: 28px; right: 20px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 22px; color: var(--muted); }
+.boss-stats b { color: var(--ink); }
+
