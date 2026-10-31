@@ -161,3 +161,33 @@ Goal (R1 = C and R2 = S in ≥ 4/5 for a, b, c-2×) is met at 12 µs, so no tuni
 | d · DPR 2 | C ×5 (5/5) | S ×4, B ×1 | S ×5 |
 
 **Calibrated for 4× (K, headless, 8.5 min):** 10,000 × 12 → R2 B×5 (render 182 ms: C11) · 6,400 × 12 → R2 S×3 A×2 · **3,600 × 12 → R1 C×5, R2 S×5, R3 S×5**. Re-test at 3,600 × 12: 4× → R1 C×4 B×1, R2 S×5, R3 S×3 A×2; normal speed → R1 C×2 B×3 (too smooth: this setting is only for a slow machine, which is why calibration runs on the stage laptop).
+
+## Phase 3b (2026-10-31)
+
+**Built:**
+- **Boss room you can read without text or sound.**
+  - Your UI is a small castle with six lit windows. Each real bite turns one window off; more than 5 bites and the towers burn.
+  - QUEST FAILED: red smoky sky, burning castle, goblins on the battlements, the dragon sunk on its belly (it did render), "TOO LATE" instead of "FINISH!", Fiber-kun kneeling with gloom lines and a broken sword, grey arena.
+  - PERFECT: all windows lit, fireworks, raised sword.
+  - Fight view: the code is one line in the header; the right side shows only two big numbers (FPS, worst key; worst key never goes down).
+  - A REPLAY step after each round shows the round's real timeline. Rounds type for 4.48 s (C11).
+  - Goblin and dragon are on Fiber-kun's ×12 grid; the dragon keeps 10,000 seamless 6 px cells.
+- **Gate ranks removed.** A Gate shows only its measured duration and turns red at ≥ 50 ms. L3 is retired; L1 now cites the W3C processing model.
+- **Slide hygiene.** "Effect: pause work."; no claim IDs on slides (notes + a hidden `?appendix` slide); Patch Notes start with a row; the freeze shows only the frozen value and the lowest fps.
+- **Floors 3–5 built** (quest board, respawn, expeditions), each with a LEVEL UP.
+- **New ending (仲間にしますか？).** はい makes Fiber-kun jump with a jingle. Real links and a QR (LinkedIn), generated at build time as inline SVG; the check decodes it from a screenshot.
+
+**Test matrix (10,000 cells × 12 µs, 4.48 s rounds; 5 runs × 3 rounds; rank counts):**
+
+| Condition | Round 1 | Round 2 | Round 3 |
+|---|---|---|---|
+| a · normal | C ×5 (QUEST FAILED 5/5) | **S ×5** | S ×5 |
+| b · recording | C ×5 | **S ×5** | S ×5 |
+| c · CPU 2× | C ×5 | **S ×5** | S ×5 |
+| c · CPU 4× | C ×5 | S ×3, A ×2 (first run) · A ×3, B ×2 (final build) | S ×1, A ×3, B ×1 · A ×3, B ×2 |
+| d · DPR 1 | C ×5 | S ×5 | S ×5 |
+| d · DPR 2 | C ×5 | S ×5 | S ×5 |
+
+The a/b/c2/c4 rows are from the final boss code (confirmation run). The d rows are from the first Phase 3b run (same game logic). Calibrated 3,600 cells × 12 µs at 4×: R1 C ×5, R2 S ×5, R3 S ×5.
+
+**Independent review:** [`reviews/PHASE3B_REVIEW.md`](reviews/PHASE3B_REVIEW.md) (raw). Its blocker (a lost round looked like a win) is fixed as above, plus most of its concrete items. Saman then asked for three more changes: no upside-down dragon, a bag + coffee instead of the laptop, and a castle instead of houses.
