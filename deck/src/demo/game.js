@@ -652,7 +652,7 @@ export function createGame(els) {
       g.headLog.slice(-2).forEach((h, i, list) => {
         const age = (now - h.t0) / 1300;
         ctx.globalAlpha = 1 - age * age;
-        const y = ROOF_TOP - 150 - (list.length - 1 - i) * 46;
+        const y = ROOF_TOP - 230 - (list.length - 1 - i) * 46; // above the flag
         ctx.fillStyle = '#05071a';
         ctx.fillText(h.text, 172, y + 4);
         ctx.fillStyle = h.color;
@@ -702,23 +702,32 @@ export function createGame(els) {
       ctx.fillStyle = light;
       for (let k = 0; k < 6; k += 2) ctx.fillRect(tx + k * PX, TOWER_TOP - PX, PX, PX);
     }
-    if (!fallen) {
-      ctx.fillStyle = '#8a5a2b';
-      ctx.fillRect(TOWERS[0] + 3 * PX, TOWER_TOP - 5 * PX, PX / 2, 4 * PX);
-      ctx.fillStyle = '#34e0a1';
-      ctx.fillRect(TOWERS[0] + 3.5 * PX, TOWER_TOP - 5 * PX, 2 * PX, PX + (Math.floor(now / 300) % 2) * 4);
+    // The castle's flag says what it stands for: "your UI". When the castle falls, the flag
+    // turns grey and burns at the corner (it stays at the top, above the goblins).
+    const poleX = TOWERS[0] + PX;
+    const poleTop = TOWER_TOP - 14 * PX;
+    ctx.fillStyle = '#8a5a2b';
+    ctx.fillRect(poleX, poleTop, PX / 2, TOWER_TOP - PX - poleTop);
+    const flagY = poleTop;
+    const wave = fallen ? 0 : (Math.floor(now / 250) % 2) * 4;
+    ctx.fillStyle = fallen ? '#5a5a66' : '#34e0a1';
+    ctx.fillRect(poleX + PX / 2, flagY + wave, 13 * PX, 4 * PX);
+    ctx.fillStyle = fallen ? '#3a3a44' : '#1d8f6a';
+    ctx.fillRect(poleX + PX / 2, flagY + wave + 4 * PX - 6, 13 * PX, 6);
+    ctx.font = '32px DotGothic16';
+    ctx.fillStyle = fallen ? '#c9c9d2' : '#120c2c';
+    ctx.fillText('your UI', poleX + PX / 2 + 6.5 * PX, flagY + wave + 2 * PX);
+    if (fallen) {
+      const flick = Math.floor(now / 90) % 3;
+      ctx.fillStyle = flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
+      ctx.fillRect(poleX + 12 * PX, flagY - PX - flick * 4, PX, 2 * PX + flick * 4);
+      ctx.fillRect(poleX + 11 * PX, flagY + 2 * PX - flick * 4, PX, PX + flick * 4);
     }
     for (let i = 0; i < WINDOWS; i++) {
       const wr = windowRect(i);
       ctx.fillStyle = i < g.darkWindows ? '#1a1430' : '#ffd166';
       ctx.fillRect(wr.x, wr.y, wr.w, wr.h);
     }
-    // Label, once: what the castle stands for (on the grass, never covered).
-    ctx.font = '32px DotGothic16';
-    ctx.fillStyle = '#05071a';
-    ctx.fillText('your UI', 134, ARENA.groundY + 34 + 3);
-    ctx.fillStyle = fallen ? '#ff5d73' : '#ffffff';
-    ctx.fillText('your UI', 132, ARENA.groundY + 34);
   }
 
   // The castle falls: fire on the towers and the wall, from the moment it falls until the reset.
