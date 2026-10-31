@@ -6,9 +6,15 @@
 // (calibration, section 7 of the Phase 3a brief): the same shape is sampled on a coarser
 // grid and then scaled up to the same size on screen, so only the DOM size changes.
 
-export const DESIGN = { cols: 125, rows: 80 };
-// Cell counts the calibration can choose from: 125×80, 100×64, 75×48, 50×32 (same 25:16 shape).
-export const CELL_LEVELS = [10000, 6400, 3600, 1600];
+export const DESIGN = { cols: 125, rows: 80 }; // design grid; 6 px per design cell on screen
+// The dragon is drawn as pixel art on Fiber-kun's ×12 grid: one art pixel = 12 px = 2×2 design cells.
+export const ART_PX = 12;
+export const DESIGN_PX = 6;
+export const DRAGON_PX = { w: DESIGN.cols * DESIGN_PX, h: DESIGN.rows * DESIGN_PX }; // 750 × 480
+// Cell counts the calibration can choose from. The cell size is a whole number of px, so there
+// are no seams: 6 px → 125×80 = 10,000 · 8 px → 93×60 = 5,580 · 10 px → 75×48 = 3,600 · 12 px → 62×40 = 2,480.
+const LEVEL_PX = { 10000: 6, 5580: 8, 3600: 10, 2480: 12 };
+export const CELL_LEVELS = [10000, 5580, 3600, 2480];
 export const DEFAULT_CELLS = 10000;
 
 const SYLLABLES = ['to', 'kyo', 'fi', 'ber', 're', 'act', 'la', 'ne', 'yo', 'ka', 'mi', 'su', 'shi', 'ta', 'na', 'ri', 'ko', 'sa'];
@@ -111,39 +117,52 @@ const used = (() => {
 export const SHAPE_ROWS_USED = used.r1 - used.r0 + 1;
 export const SHAPE_COLS_USED = used.c1 - used.c0 + 1;
 
+// The art: the design shape sampled once per 12 px art pixel (63 × 40).
+const ART = { cols: Math.ceil(DRAGON_PX.w / ART_PX), rows: DRAGON_PX.h / ART_PX };
+const artRaw = Array.from({ length: ART.cols * ART.rows }, (_, i) => {
+  const ax = i % ART.cols;
+  const ay = Math.floor(i / ART.cols);
+  const dx = Math.min(DESIGN.cols - 1, ax * 2 + 1);
+  const dy = Math.min(DESIGN.rows - 1, ay * 2 + 1);
+  return ax * 2 + 1 >= DESIGN.cols ? 0 : DESIGN_SHAPE[dy * DESIGN.cols + dx];
+});
+const artAt = (x, y) => (x < 0 || y < 0 || x >= ART.cols || y >= ART.rows ? 0 : artRaw[y * ART.cols + x]);
+// Shading on body art pixels: 4 = highlight (open air above), 3 = shade (open air below).
+const ART_SHAPE = artRaw.map((v, i) => {
+  if (v !== 1) return v;
+  const x = i % ART.cols;
+  const y = Math.floor(i / ART.cols);
+  if (artAt(x, y - 1) === 0) return 4;
+  if (artAt(x, y + 1) === 0) return 3;
+  return 1;
+});
+
 const cache = new Map();
-// The dragon drawn with `cells` grid cells (one of CELL_LEVELS).
+// The dragon drawn with `cells` grid cells (one of CELL_LEVELS). Every cell is one fiber and one
+// DOM node; it takes the colour of the 12 px art pixel under its centre.
 export function makeDragon(cells = DEFAULT_CELLS) {
   if (!CELL_LEVELS.includes(cells)) cells = DEFAULT_CELLS;
   if (cache.has(cells)) return cache.get(cells);
-  const k = Math.round(Math.sqrt(cells / (DESIGN.cols * DESIGN.rows)) * 5) / 5; // 1, 0.8, 0.6, 0.4
-  const cols = Math.round(DESIGN.cols * k);
-  const rows = Math.round(DESIGN.rows * k);
+  const px = LEVEL_PX[cells];
+  const cols = Math.floor(DRAGON_PX.w / px);
+  const rows = DRAGON_PX.h / px;
   const count = cols * rows;
-  const raw = Array.from({ length: count }, (_, i) => {
-    const dx = Math.floor(((i % cols) + 0.5) * (DESIGN.cols / cols));
-    const dy = Math.floor((Math.floor(i / cols) + 0.5) * (DESIGN.rows / rows));
-    return DESIGN_SHAPE[dy * DESIGN.cols + dx];
-  });
-  const at = (x, y) => (x < 0 || y < 0 || x >= cols || y >= rows ? 0 : raw[y * cols + x]);
-  // Shading on body cells: 4 = highlight (open air above), 3 = shade (open air below).
-  const shape = raw.map((v, i) => {
-    if (v !== 1) return v;
-    const x = i % cols;
-    const y = Math.floor(i / cols);
-    if (at(x, y - 1) === 0) return 4;
-    if (at(x, y + 1) === 0 || (k === 1 && at(x, y + 2) === 0)) return 3;
-    return 1;
+  const shape = Array.from({ length: count }, (_, i) => {
+    const ax = Math.floor((((i % cols) + 0.5) * px) / ART_PX);
+    const ay = Math.floor(((Math.floor(i / cols) + 0.5) * px) / ART_PX);
+    return ART_SHAPE[ay * ART.cols + ax];
   });
   const names = NAMES.slice(0, count);
   const d = {
     cells: count,
     cols,
     rows,
+    cellPx: px,
     names,
     shape,
     baseClass: shape.map((v) => `c${v}`),
-    hitClass: shape.map((v) => (v === 0 ? 'h0' : 'h1')),
+    // a search hit: a lighter shade of the same art colour (no noise on the ×12 pixel art)
+    hitClass: shape.map((v) => (v === 0 ? 'c0' : `c${v} h`)),
     countHits(q) {
       if (!q) return 0;
       let n = 0;

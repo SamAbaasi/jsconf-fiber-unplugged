@@ -16,7 +16,7 @@ export const SCALES = {
   boss: {
     arenaH: 760, // boss arena height H, px
     hero: 12, // Fiber-kun in the arena
-    goblin: 6,
+    goblin: 12, // 8×8 goblin on the same ×12 grid as Fiber-kun
     dragonH: 480, // the dragon's drawn height, px: 80 rows × 6 px, so 10,000 cells are whole pixels
   },
 };

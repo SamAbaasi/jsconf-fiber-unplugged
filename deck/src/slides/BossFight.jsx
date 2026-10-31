@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState, useTransition, useDeferredValue }
 import { DragonList, TextProbe } from '../demo/DragonList.jsx';
 import { calibrate, settings, setMicrosPerCell } from '../demo/work.js';
 import { startMonitor } from '../demo/monitor.js';
-import { createGame, ARENA, DRAGON_BOX } from '../demo/game.js';
+import { createGame, ARENA, DRAGON_BOX, traces } from '../demo/game.js';
+
+const REPLAY_LINES = ['replaySync', 'replayTransition', 'replayDeferred'];
 import { makeDragon, CELL_LEVELS, DEFAULT_CELLS } from '../demo/dragon.js';
 import { startPhaseObserver } from '../demo/phases.js';
+import { drawReplay } from '../demo/replay.js';
 import { runCalibration, showChecklist } from '../demo/calibration.js';
 import { record } from '../instrument/eventLog.js';
 import { isTyping } from '../engine/keys.js';
@@ -32,12 +35,14 @@ const MODES = [
   },
 ];
 
-// Auto-type: five words, one letter every 150 ms, a short hold, then clear.
-// About 6 seconds of steady typing, so each round has a real fight before the result.
-const TYPE_EVERY_MS = 150;
+// Auto-type: four words, one letter every 140 ms, two holds, then clear: 32 steps = 4.48 s.
+// Kept under 4.5 s on purpose: a Scheduler task that stays alive for more than 5 s times out
+// and React then renders it without slicing (CLAIMS C11), which would turn round 2 into a long
+// frame on a slow laptop. The holds also let pending work finish between words.
+const TYPE_EVERY_MS = 140;
 const TYPING_SCRIPT = (() => {
   const steps = [];
-  for (const word of ['tokyo', 'fiber', 'react', 'sushi', 'kyoto']) {
+  for (const word of ['tokyo', 'fiber', 'react', 'kyoto']) {
     for (let i = 1; i <= word.length; i++) steps.push(word.slice(0, i));
     steps.push(null, null, ''); // hold (no event), hold, clear
   }
@@ -70,25 +75,33 @@ function typeInto(input, value) {
 // The line under the result. Only shown when the real result matches it.
 function resultLine(r, modeKey) {
   if ((r.rank === 'S' || r.rank === 'A') && modeKey !== 'sync') return LINES.resultWinYield.text;
+  if (r.questFailed && r.dragonDown) return LINES.questFailedLine.text;
   if (r.rank === 'C' && modeKey === 'sync') return LINES.resultLoseSync.text;
   return '';
 }
 
+// Steps: round 1, replay 1, round 2, replay 2, round 3, replay 3.
+const roundOf = (step) => Math.min(MODES.length - 1, Math.floor(step / 2));
+const isReplayStep = (step) => step % 2 === 1;
+
 export function BossFight({ step }) {
   // Calibration can drive the three modes itself; otherwise the slide step decides.
   const [modeOverride, setModeOverride] = useState(null);
-  const mode = MODES[modeOverride ?? Math.min(step, MODES.length - 1)];
+  const mode = MODES[modeOverride ?? roundOf(step)];
+  const replay = modeOverride === null && isReplayStep(step);
+  const [traceVersion, setTraceVersion] = useState(0);
+  const replayRef = useRef(null);
   const [micros, setMicros] = useState(initialWork);
   const [cells, setCells] = useState(initialCells);
   const dragon = useMemo(() => makeDragon(cells), [cells]);
-  const dragonScale = DRAGON_BOX.w / (dragon.cols * 4);
+
   const [text, setText] = useState({ v: '', seq: 0 });
   const [query, setQuery] = useState({ v: '', seq: 0 });
   const [isPending, startTransition] = useTransition();
   // Only fed while in deferred mode; otherwise it holds null and never defers.
   const deferredText = useDeferredValue(mode.key === 'deferred' ? text : null);
 
-  const names = ['arena', 'world', 'fx', 'hydra', 'dragonKb', 'hydraName', 'timer', 'overlay', 'calib', 'fkHpBar', 'fkHpText', 'hydraHpBar', 'hydraHpText', 'respawnText', 'timeline', 'fpsGraph', 'fps', 'worst'];
+  const names = ['arena', 'world', 'fx', 'hydra', 'dragonKb', 'hydraName', 'timer', 'overlay', 'calib', 'hydraHpBar', 'hydraHpText', 'fps', 'worstKey'];
   const refs = Object.fromEntries(names.map((n) => [n, useRef(null)]));
   const inputRef = useRef(null);
   const typingTimer = useRef(0);
@@ -104,6 +117,7 @@ export function BossFight({ step }) {
     startPhaseObserver();
     const els = Object.fromEntries(names.map((n) => [n, refs[n].current]));
     els.resultLine = (r) => resultLine(r, modeRef.current.key);
+    els.onTrace = () => setTraceVersion((v) => v + 1);
     const game = createGame(els);
     gameRef.current = game;
     const stop = startMonitor(els, game);
@@ -238,6 +252,14 @@ export function BossFight({ step }) {
     };
   }, []);
 
+  // REPLAY: draw the finished round's real timeline (static; drawn once per change).
+  useEffect(() => {
+    if (!replay || !replayRef.current) return;
+    const i = roundOf(step);
+    const summary = drawReplay(replayRef.current, traces[i], LINES[REPLAY_LINES[i]].text);
+    replayRef.current.dataset.summary = summary ? JSON.stringify(summary) : '';
+  }, [replay, step, traceVersion]);
+
   const listQuery = mode.key === 'deferred' ? (deferredText ?? query) : query;
   const pending = mode.key === 'transition' ? isPending : mode.key === 'deferred' ? deferredText !== null && deferredText !== text : false;
 
@@ -261,7 +283,7 @@ export function BossFight({ step }) {
         <canvas ref={refs.world} className="boss-layer pixelated" width={ARENA.w} height={ARENA.h} />
         <div className="boss-hydra" ref={refs.hydra} style={{ left: DRAGON_BOX.x, top: DRAGON_BOX.y, width: DRAGON_BOX.w, height: DRAGON_BOX.h }}>
           <div className="dragon-kb" ref={refs.dragonKb}>
-            <div className={`dragon-scale ${pending ? 'is-pending' : ''}`} style={{ transform: `scale(${dragonScale})` }}>
+            <div className={`dragon-scale ${pending ? 'is-pending' : ''}`}>
               <DragonList dragon={dragon} query={listQuery.v} seq={listQuery.seq} />
             </div>
           </div>
@@ -269,14 +291,6 @@ export function BossFight({ step }) {
         <div className="boss-timer" ref={refs.timer} />
         <canvas ref={refs.fx} className="boss-layer boss-fx pixelated" width={ARENA.w} height={ARENA.h} />
 
-        <div className="hud hud-fk">
-          <div className="hud-name">Fiber-kun · village</div>
-          <div className="hud-bar">
-            <div className="hud-fill is-fk" ref={refs.fkHpBar} />
-          </div>
-          <div className="hud-num" ref={refs.fkHpText} />
-          <div className="hud-num hud-respawn" ref={refs.respawnText} />
-        </div>
         <div className="hud hud-boss">
           <div className="hud-name" ref={refs.hydraName}>
             JANK DRAGON
@@ -309,35 +323,34 @@ export function BossFight({ step }) {
         <div className={`boss-pending ${pending ? 'is-on' : ''}`}>{pending ? 'pending…' : ''}</div>
       </div>
 
-      <div className="win boss-fps" style={{ position: 'absolute' }}>
-        <div className="win-title">FPS</div>
-        <div className="boss-fps-num" ref={refs.fps}>
+      {/* Right side during the fight: the code, then only two big numbers. */}
+      <div className="win boss-code" style={{ position: 'absolute' }}>
+        <pre className="boss-code-pre">{mode.code.join('\n')}</pre>
+      </div>
+      <div className="win boss-big boss-big-fps" style={{ position: 'absolute' }}>
+        <div className="boss-big-label">FPS</div>
+        <div className="boss-big-num boss-fps-num" ref={refs.fps}>
           60
         </div>
-        <canvas ref={refs.fpsGraph} className="boss-fps-graph" width={400} height={110} />
-        <div className="boss-fps-worst">
-          worst gap, last 3 s <b ref={refs.worst}>–</b>
-        </div>
       </div>
-
-      <div className="win boss-timeline" style={{ position: 'absolute' }}>
-        <div className="win-title">LIVE · real scheduler</div>
-        <canvas ref={refs.timeline} width={650} height={316} />
-        <div className="boss-legend">
-          <span className="lg lg-s">sync</span>
-          <span className="lg lg-d">slice</span>
-          <span className="lg lg-x">thrown away</span>
-          <span className="lg lg-r">long frame</span>
+      <div className="win boss-big boss-big-key" style={{ position: 'absolute' }}>
+        <div className="boss-big-label">worst key</div>
+        <div className="boss-big-num boss-key-num" ref={refs.worstKey}>
+          –
         </div>
-      </div>
-
-      <div className="win boss-code" style={{ position: 'absolute' }}>
-        <div className="win-title">CODE</div>
-        <pre className="boss-code-pre">{mode.code.join('\n')}</pre>
       </div>
 
       {/* READY and RESULT panels cover the instruments between rounds, so the arena stays visible. */}
       <div className="boss-overlay" ref={refs.overlay} />
+      {/* REPLAY: the real timeline of the round that just ended, full screen. */}
+      {replay && (
+        <div className="boss-replay">
+          <div className="boss-replay-title">
+            REPLAY · ROUND {roundOf(step) + 1} · {mode.title}
+          </div>
+          <canvas ref={replayRef} className="boss-replay-canvas" width={1840} height={840} />
+        </div>
+      )}
       {/* Calibration (K): written by demo/calibration.js, outside React. */}
       <div className="boss-calib" ref={refs.calib} />
     </div>

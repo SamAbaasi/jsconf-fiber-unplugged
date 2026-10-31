@@ -2,23 +2,27 @@
 //   GOBLIN = one keystroke = one urgent update (setText, SyncLane: D2). It appears when the
 //            input event happens and is resolved on the first animation frame after the
 //            commit that puts that keystroke's text in the DOM. Latency = that frame's time
-//            − event.timeStamp. Latency > 50 ms → it bites for the latency in ms.
+//            − event.timeStamp. Latency > 50 ms → it reaches the VILLAGE (your UI) and bites:
+//            one window goes dark. More than RULES.questFailBites bites → the village falls.
 //   DRAGON = the heavy list, one fiber per cell (setQuery / deferred query). Its HP = the
 //            keystrokes of this round the list has not rendered yet. Each real list commit is
 //            a slash that lands; the final commit (the one that shows the last keystroke)
 //            kills it.
 // The round's result is decided by the bites only (never by HP luck): more than
 // RULES.questFailBites bites = QUEST FAILED, even if the dragon went down.
-// Hit effects (flash, spark, number, knockback) are drawn at the point of contact.
+// The end of a round must be readable with the sound off and without reading:
+//   QUEST FAILED: the dragon falls, the village burns, goblins dance on the roofs, Fiber-kun
+//                 kneels with a broken sword, the arena turns grey.
+//   PERFECT:      the dragon falls, every window is lit, Fiber-kun raises his sword, fireworks.
 // All of this runs in the monitor's rAF loop, outside React.
 import { FIBER_KUN, FACES, PALETTE } from '../sprites/fiberkun.js';
-const FACE_HURT = FACES.shocked;
 import { GOBLIN, GOBLIN_PALETTE } from '../sprites/goblin.js';
 import { drawSword } from '../sprites/sword.js';
 import { spriteCanvas } from '../ui/Sprite.jsx';
-import { makeDragon, DESIGN, DRAGON_POINTS, DEFAULT_CELLS } from './dragon.js';
+import { makeDragon, DESIGN, DESIGN_PX, DRAGON_PX, DRAGON_POINTS, DEFAULT_CELLS } from './dragon.js';
 import { SCALES, bbox, reportBox } from '../sprites/scale.js';
 import { analyzePhases } from './phases.js';
+import { eventLog } from '../instrument/eventLog.js';
 import { play } from '../audio/sfx.js';
 
 export const RULES = {
@@ -28,48 +32,63 @@ export const RULES = {
   maxRoundMs: 20000, // safety net only
 };
 
-// Rank, decided only by real numbers. Shown on screen and in the notes.
+// Rank, decided only by real numbers. In the speaker notes; the audience sees the scene.
 export function rankOf({ bites, worst }) {
   if (bites === 0 && worst <= 100) return 'S';
   if (bites <= 2 && worst <= 150) return 'A';
   if (bites <= RULES.questFailBites) return 'B';
   return 'C';
 }
-export const RANK_RULE = 'S: 0 bites, no frame > 100 ms · A: ≤ 2 bites, ≤ 150 ms · B: ≤ 5 bites · C: more bites = QUEST FAILED';
+export const RANK_RULE = 'S: 0 bites, no frame gap > 100 ms · A: ≤ 2 bites, ≤ 150 ms · B: ≤ 5 bites · C: more bites = QUEST FAILED';
 
 // Same boss, same workload, three looks.
 export const FORMS = [
-  { name: 'JANK DRAGON', cls: 'form-1', crown: false },
-  { name: 'JANK DRAGON · FROST', cls: 'form-2', crown: false },
-  { name: 'JANK DRAGON · NIGHT', cls: 'form-3', crown: false },
+  { name: 'JANK DRAGON', cls: 'form-1' },
+  { name: 'JANK DRAGON · FROST', cls: 'form-2' },
+  { name: 'JANK DRAGON · NIGHT', cls: 'form-3' },
 ];
 
 // Proportions come from the scale bible (sprites/scale.js; checked by scripts/check-scale.mjs).
+// Fiber-kun, the goblins and the dragon are all drawn on the same ×12 pixel grid.
 export const ARENA = { w: 1150, h: SCALES.boss.arenaH, groundY: 690 };
-const DRAGON_H = SCALES.boss.dragonH; // the dragon's drawn height
-const DESIGN_PX = DRAGON_H / DESIGN.rows; // one design-grid cell on screen
-const DRAGON_W = Math.round(DESIGN.cols * DESIGN_PX);
+const DRAGON_W = DRAGON_PX.w;
+const DRAGON_H = DRAGON_PX.h;
 // Right edge 24 px inside the arena (5 px border), so the 12 px knockback never clips the tail.
 export const DRAGON_BOX = { x: ARENA.w - 5 - DRAGON_W - 24, y: ARENA.groundY - DRAGON_H, w: DRAGON_W, h: DRAGON_H };
 const HERO_SCALE = SCALES.boss.hero;
 const HERO_SIZE = 16 * HERO_SCALE;
 const SWORD = 1.05; // sword scale, matched to the hero size
 const REACH = 148; // slash arc radius = blade tip (142 px × SWORD)
-const HERO_HOME = 270;
+const HERO_HOME = 360;
 // Dash so the blade tip passes the dragon's chest at the contact frame (computed, not tuned).
-const CHEST_PT = [DRAGON_BOX.x + DRAGON_POINTS.chest[0] * (DRAGON_H / DESIGN.rows), DRAGON_BOX.y + DRAGON_POINTS.chest[1] * (DRAGON_H / DESIGN.rows)];
+const CHEST = [DRAGON_BOX.x + DRAGON_POINTS.chest[0] * DESIGN_PX, DRAGON_BOX.y + DRAGON_POINTS.chest[1] * DESIGN_PX];
+const HEAD = [DRAGON_BOX.x + DRAGON_POINTS.head[0] * DESIGN_PX, DRAGON_BOX.y + DRAGON_POINTS.head[1] * DESIGN_PX];
 const HAND_Y = ARENA.groundY - HERO_SIZE + HERO_SIZE * 0.62;
-const HAND_X = CHEST_PT[0] - Math.sqrt(REACH ** 2 - (HAND_Y - CHEST_PT[1]) ** 2);
-const CONTACT_ANGLE = Math.atan2(CHEST_PT[1] - HAND_Y, CHEST_PT[0] - HAND_X);
+const HAND_X = CHEST[0] - Math.sqrt(REACH ** 2 - (HAND_Y - CHEST[1]) ** 2);
+const CONTACT_ANGLE = Math.atan2(CHEST[1] - HAND_Y, CHEST[0] - HAND_X);
 const HERO = { homeX: HERO_HOME, scale: HERO_SCALE, size: HERO_SIZE, dash: Math.round(HAND_X - (HERO_HOME + HERO_SIZE - 24)) };
 const GOBLIN_SCALE = SCALES.boss.goblin;
-const GOBLIN_SLOTS = [150, 56, -38];
+const GOBLIN_W = 8 * GOBLIN_SCALE;
+const GOBLIN_SLOTS = [252, 196]; // waiting goblins, between the village and Fiber-kun
 const DASH_MS = 90;
 const SLASH_MS = 80;
 const RETURN_MS = 150;
 // Contact: the moment the slash (from −2.3 to +1.0 rad) passes the chest angle.
 const IMPACT_AT = DASH_MS + Math.round(SLASH_MS * ((CONTACT_ANGLE + 2.3) / 3.3));
 const WHITE_GOBLIN = Object.fromEntries(Object.entries(GOBLIN_PALETTE).map(([k]) => [k, '#ffffff']));
+
+// The village = your UI. Three houses on the ×12 grid, two windows each: six windows,
+// one per allowed bite. The sixth bite (more than questFailBites) makes it fall.
+const PX = 12;
+const HOUSES = [12, 92, 172].map((x) => ({ x, w: 6 * PX }));
+const WINDOWS = HOUSES.length * 2;
+const HOUSE_TOP = ARENA.groundY - 5 * PX; // wall top
+const ROOF_TOP = HOUSE_TOP - 3 * PX;
+const windowRect = (i) => {
+  const h = HOUSES[i % HOUSES.length];
+  const k = Math.floor(i / HOUSES.length);
+  return { x: h.x + (k ? 4 : 1) * PX, y: HOUSE_TOP + PX, w: PX, h: 2 * PX };
+};
 
 // A small log of landed hits, so tests can find the frames where contact happens.
 const hitLog = (globalThis.__fiberHits = globalThis.__fiberHits || []);
@@ -78,15 +97,8 @@ function logHit(type, t) {
   if (hitLog.length > 500) hitLog.shift();
 }
 
-const toArena = ([gx, gy]) => [DRAGON_BOX.x + gx * DESIGN_PX, DRAGON_BOX.y + gy * DESIGN_PX];
-const CHEST = toArena(DRAGON_POINTS.chest);
-const HEAD = toArena(DRAGON_POINTS.head);
-// Screen size of one grid cell of a dragon with d.cols columns.
-export const cellPx = (d) => DRAGON_W / d.cols;
-const cellPos = (d, i) => {
-  const c = cellPx(d);
-  return [DRAGON_BOX.x + ((i % d.cols) + 0.5) * c, DRAGON_BOX.y + (Math.floor(i / d.cols) + 0.5) * c];
-};
+// Screen position of a dragon cell's centre.
+const cellPos = (d, i) => [DRAGON_BOX.x + ((i % d.cols) + 0.5) * d.cellPx, DRAGON_BOX.y + (Math.floor(i / d.cols) + 0.5) * d.cellPx];
 
 // White silhouette of the dragon, for the hit flash (one per cell count).
 const silhouettes = new Map();
@@ -97,12 +109,23 @@ function dragonSilhouette(d) {
   c.height = DRAGON_H;
   const g = c.getContext('2d');
   g.fillStyle = '#ffffff';
-  const px = cellPx(d);
   for (let i = 0; i < d.cells; i++) {
-    if (d.shape[i]) g.fillRect(Math.floor((i % d.cols) * px), Math.floor(Math.floor(i / d.cols) * px), Math.ceil(px), Math.ceil(px));
+    if (d.shape[i]) g.fillRect((i % d.cols) * d.cellPx, Math.floor(i / d.cols) * d.cellPx, d.cellPx, d.cellPx);
   }
   silhouettes.set(d, c);
   return c;
+}
+
+// Every round's trace (for the REPLAY step): raw events + frame times, by round index.
+export const traces = (globalThis.__roundTraces ||= {});
+function captureTrace(t0, t1) {
+  const ev = [];
+  const end = eventLog.n;
+  for (let i = Math.max(0, end - eventLog.size); i < end; i++) {
+    const e = eventLog.buf[i % eventLog.size];
+    if (e && e.t >= t0 && e.t <= t1) ev.push(e);
+  }
+  return ev;
 }
 
 function freshRound() {
@@ -122,15 +145,18 @@ function freshRound() {
     goblinCount: 0,
     bites: 0,
     biteDamage: 0,
+    darkWindows: 0, // windows gone dark = bites that reached the village
     latencies: [],
+    worstKey: 0, // only grows during a round
     worst: 0,
     frames: 0,
+    frameTimes: [],
     thrown: 0,
     commits: 0,
     impacts: [], // dragon hits waiting for their contact frame
     sparks: [],
     floaters: [],
-    headLog: [], // numbers above Fiber-kun's head (bites, input delay)
+    headLog: [],
     action: null, // { kind: 'dash' | 'goblin' | 'respawn', t0 }
     attempting: false,
     flashUntil: 0,
@@ -152,19 +178,15 @@ export function createGame(els) {
   const g = { round: 0, modeTitle: '', form: FORMS[0], dragon: makeDragon(DEFAULT_CELLS), ...freshRound() };
 
   const keysInRound = () => (g.lastKeySeq ? g.lastKeySeq - g.firstSeq + 1 : 0);
-  const renderedInRound = () => (g.listSeq >= g.firstSeq && g.firstSeq ? g.listSeq - g.firstSeq + 1 : 0);
 
   function updateHud() {
-    // The village: it falls after more than questFailBites bites. Only bites change it.
-    const left = Math.max(0, RULES.questFailBites + 1 - g.bites);
-    setWidth(els.fkHpBar, left / (RULES.questFailBites + 1));
-    setText(els.fkHpText, g.bites > RULES.questFailBites ? 'village: FALLEN' : `village: ${left} bites left`);
     const max = Math.max(1, g.dragonMax);
     setWidth(els.hydraHpBar, g.phase === 'ready' ? 1 : g.dragonHp / max);
-    setText(els.hydraHpText, g.phase === 'ready' ? 'HP = keys not rendered' : `HP ${g.dragonHp} / ${g.dragonMax} keys`);
-    setText(els.respawnText, `goblins ${g.goblinCount} · bites ${g.bites}`);
+    setText(els.hydraHpText, g.phase === 'ready' ? 'HP = keys not on screen' : `HP ${g.dragonHp} / ${g.dragonMax}`);
     const t = g.phase === 'ready' ? 0 : (g.phase === 'fight' ? performance.now() : g.finishAt || g.resultAt) - g.startAt;
     setText(els.timer, `${(Math.max(0, t) / 1000).toFixed(1)} s`);
+    setText(els.worstKey, g.latencies.length ? `${Math.round(g.worstKey)} ms` : '–');
+    if (els.worstKey) els.worstKey.dataset.level = !g.latencies.length ? 'none' : g.worstKey > RULES.jankMs ? 'bad' : 'good';
   }
 
   function showReady() {
@@ -172,27 +194,30 @@ export function createGame(els) {
     els.overlay.className = 'boss-overlay is-ready';
     els.overlay.dataset.result = '';
     els.overlay.innerHTML = `
-      <div class="bo-title">ROUND ${g.round + 1}<span class="bo-mode"> · ${g.modeTitle}</span></div>
+      <div class="bo-title">ROUND ${g.round + 1}</div>
+      <div class="bo-mode">${g.modeTitle}</div>
       <div class="bo-rules">
-        <div><b class="g">GOBLIN</b> = 1 keystroke. Late &gt; ${RULES.jankMs} ms → it <b class="r">bites</b>.</div>
-        <div><b class="g">DRAGON</b> = the big list. Each update on screen = 1 hit.</div>
-        <div>&gt; ${RULES.questFailBites} bites → <b class="r">QUEST FAILED</b></div>
+        <div><b class="g">GOBLIN</b> = 1 keystroke</div>
+        <div>late &gt; ${RULES.jankMs} ms → it <b class="r">bites your UI</b></div>
+        <div><b class="g">DRAGON</b> = the big list</div>
       </div>
-      <div class="bo-rule">${RANK_RULE}</div>
-      <div class="bo-start blink">type to start · ↑ jump</div>`;
+      <div class="bo-start blink">type to start</div>`;
   }
 
   function reset() {
     Object.assign(g, freshRound());
     if (els.hydra) {
-      // Snap back without the collapse transition (otherwise the legs sink into the grass).
+      // Snap back without the fall transition (otherwise the legs sink into the grass).
       els.hydra.style.transition = 'none';
       els.hydra.className = `boss-hydra ${g.form.cls}`;
       void els.hydra.offsetWidth;
       els.hydra.style.transition = '';
     }
     if (els.dragonKb) els.dragonKb.style.transform = '';
-    if (els.arena) els.arena.style.transform = '';
+    if (els.arena) {
+      els.arena.style.transform = '';
+      els.arena.classList.remove('is-grey');
+    }
     setText(els.hydraName, g.form.name);
     updateHud();
     showReady();
@@ -203,6 +228,7 @@ export function createGame(els) {
     g.phase = 'finishing';
     g.finishAt = now;
     g.outcome = outcome;
+    // The dragon falls whenever the list really showed the last keystroke (it did render).
     if (outcome === 'WIN' && els.hydra) els.hydra.classList.add('is-collapsed');
   }
 
@@ -210,7 +236,6 @@ export function createGame(els) {
     g.phase = 'result';
     g.resultAt = now;
     const rank = rankOf({ bites: g.bites, worst: g.worst });
-    // Deterministic outcome: the bites decide. The dragon may be down and the quest still failed.
     const questFailed = g.bites > RULES.questFailBites;
     const dur = Math.max(1, g.finishAt - g.startAt);
     const lat = g.latencies;
@@ -237,54 +262,44 @@ export function createGame(els) {
       phases: analyzePhases(g.startAt, g.finishAt + 200),
       inputDelays: g.inputDelays.slice(),
       durationMs: Math.round(dur),
+      typingMs: g.lastKeyAt ? Math.round(g.lastKeyAt - g.startAt) : 0,
     };
-    if (els.hydra) {
-      // A dragon that really went down stays down (S/C) or retreats (A/B).
-      // Only a dragon that was never killed (TIME UP) stands and laughs.
-      if (rank === 'A' || rank === 'B') els.hydra.classList.replace('is-collapsed', 'is-retreat');
-    }
-    play(rank === 'S' ? 'fanfare' : rank === 'C' ? 'lose' : 'rank');
+    traces[g.round] = {
+      round: g.round + 1,
+      mode: g.modeTitle,
+      t0: g.startAt,
+      t1: g.finishAt,
+      events: captureTrace(g.startAt - 100, g.finishAt + 300),
+      frames: g.frameTimes.slice(),
+      result: g.result,
+    };
+    els.onTrace?.(g.round);
+    if (els.hydra && (rank === 'A' || rank === 'B')) els.hydra.classList.replace('is-collapsed', 'is-retreat');
+    if (els.arena && questFailed) els.arena.classList.add('is-grey');
+    play(rank === 'S' ? 'fanfare' : questFailed ? 'lose' : 'rank');
     if (g.outcome !== 'WIN') setTimeout(() => play('laugh'), 1300);
     renderResult();
   }
 
+  // The audience sees one number: the worst keystroke. The rest is in data-result (and notes).
   function renderResult() {
     const r = g.result;
     if (!els.overlay) return;
     const title = r.questFailed ? 'QUEST FAILED' : { S: 'PERFECT', A: 'GREAT!', B: 'CLEAR', C: 'QUEST FAILED' }[r.rank];
-    // The subtitle names the real cause of the rank.
-    const outcome = r.questFailed
-      ? r.dragonDown
-        ? `DRAGON DOWN… but the village fell (${r.bites} bites)`
-        : `the village fell (${r.bites} bites)`
-      : r.dragonDown
-        ? 'DRAGON DOWN'
-        : r.outcome;
-    const ph = r.phases?.worst;
-    const phaseLine = ph
-      ? `<div class="bo-phase">longest frame by the Long Animation Frame API: ${ph.duration} ms = render ${ph.render} · commit ${ph.commit} · style/layout/paint ${ph.styleLayoutPaint} · canvas ${ph.canvas} · other ${ph.other}</div>`
-      : '';
+    const sub = r.questFailed ? (r.dragonDown ? 'dragon down… but the village fell' : 'the village fell') : r.dragonDown ? 'dragon down · village safe' : r.outcome;
     const line = els.resultLine ? els.resultLine(r) : '';
-    els.overlay.className = `boss-overlay is-result tier-${r.rank}`;
+    els.overlay.className = `boss-overlay is-result tier-${r.questFailed ? 'C' : r.rank}`;
     els.overlay.dataset.result = JSON.stringify(r);
     els.overlay.innerHTML = `
       <div class="bo-res">
         <div>
           <div class="bo-title">${title}</div>
-          <div class="bo-sub">${outcome} · round ${r.round}</div>
-          <div class="bo-grid">
-            <span>bites</span><b>${r.bites} / ${r.goblins}</b>
-            <span>worst key</span><b>${r.worstLatencyMs} ms</b>
-            <span>worst frame gap</span><b>${r.worstFrameMs} ms</b>
-            <span>thrown away</span><b>${r.thrownAway}</b>
-            <span>commits</span><b>${r.commits}</b>
-          </div>
+          <div class="bo-sub">${sub}</div>
         </div>
         <div class="bo-rank rank-${r.rank}"><span>RANK</span>${r.rank}</div>
       </div>
-      ${phaseLine}
-      ${line ? `<div class="bo-line">${line}</div>` : ''}
-      <div class="bo-rule">${RANK_RULE}</div>`;
+      <div class="bo-key"><span>worst key</span><b class="${r.worstLatencyMs > RULES.jankMs ? 'bad' : 'good'}">${r.worstLatencyMs} ms</b></div>
+      ${line ? `<div class="bo-line">${line}</div>` : ''}`;
   }
 
   function heroX(now) {
@@ -328,6 +343,7 @@ export function createGame(els) {
   return {
     state: g,
     rules: RULES,
+    dragonBox: DRAGON_BOX,
     setRound(index, modeTitle) {
       g.round = index;
       g.modeTitle = modeTitle;
@@ -340,7 +356,6 @@ export function createGame(els) {
       g.dragon = makeDragon(cells);
       if (g.phase === 'ready') showReady();
     },
-    dragonBox: DRAGON_BOX,
     onTypingStart(total) {
       if (g.phase === 'ready') g.typingTotal = total;
     },
@@ -375,7 +390,6 @@ export function createGame(els) {
     onTextCommit(e) {
       for (const gb of g.goblins) if (gb.state === 'wait' && gb.seq <= e.seq && !gb.committedAt) gb.committedAt = e.t;
     },
-    // React started rendering the list: Fiber-kun takes his stance against the dragon.
     onAttempt() {
       if (g.phase === 'fight') g.attempting = true;
     },
@@ -410,6 +424,7 @@ export function createGame(els) {
       if (g.phase === 'fight') {
         g.worst = Math.max(g.worst, dt);
         g.frames++;
+        g.frameTimes.push(now);
       }
 
       // Goblins: resolve the ones whose text was committed before this frame.
@@ -417,37 +432,46 @@ export function createGame(els) {
         if (gb.state === 'wait' && gb.committedAt && now > gb.committedAt) {
           const latency = now - gb.ts;
           g.latencies.push(latency);
+          g.worstKey = Math.max(g.worstKey, latency);
           gb.latency = Math.round(latency);
           gb.t0 = now;
           if (latency > RULES.jankMs) {
             gb.state = 'bite';
+            gb.window = g.bites; // which window it will darken
             g.bites++;
           } else {
             gb.state = 'dying';
             g.action = { kind: 'goblin', t0: now };
           }
         }
-        // The bite lands 120 ms into the lunge: damage and number at the contact frame.
-        if (gb.state === 'bite' && !gb.bitten && now - gb.t0 >= 120) {
+        // The goblin runs into the village; at contact a window goes dark.
+        if (gb.state === 'bite' && !gb.bitten && now - gb.t0 >= 160) {
           gb.bitten = true;
           g.biteDamage += gb.latency;
-          g.fkHitAt = now;
-          g.shake = Math.min(26, 6 + gb.latency / 10);
+          g.darkWindows = Math.min(WINDOWS, g.darkWindows + 1);
+          const w = windowRect(Math.min(gb.window, WINDOWS - 1));
+          g.sparks.push({ x: w.x + PX / 2, y: w.y + PX, t0: now, smoke: true });
+          g.shake = Math.min(14, 4 + gb.latency / 30);
           g.shakeAt = now;
           headText(`BITE! ${gb.latency} ms late`, '#ff5d73', now);
           play('hit');
         }
-        // After biting, Fiber-kun turns and cuts it down.
-        if (gb.state === 'bite' && now - gb.t0 >= 320) {
-          gb.state = 'dying';
-          gb.t0 = now;
-          g.action = { kind: 'goblin', t0: now };
+        // After biting, it climbs onto a roof and stays there (one per house), or vanishes.
+        if (gb.state === 'bite' && now - gb.t0 >= 360) {
+          const onRoofs = g.goblins.filter((x) => x.state === 'roof').length;
+          if (onRoofs < HOUSES.length) {
+            gb.state = 'roof';
+            gb.house = onRoofs;
+          } else {
+            gb.state = 'dying';
+            gb.t0 = now;
+            gb.quiet = true;
+          }
         }
-        if (gb.state === 'dying' && !gb.cut && now - gb.t0 >= 70) {
+        if (gb.state === 'dying' && !gb.cut && !gb.quiet && now - gb.t0 >= 70) {
           gb.cut = true;
           logHit('goblin', now);
-          const x = GOBLIN_SLOTS[0] + 48;
-          g.sparks.push({ x, y: ARENA.groundY - 60, t0: now });
+          g.sparks.push({ x: GOBLIN_SLOTS[0] + GOBLIN_W / 2, y: ARENA.groundY - 48, t0: now });
           play('dodge');
         }
         if (gb.state === 'dying' && now - gb.t0 >= 320) gb.state = 'dead';
@@ -513,12 +537,7 @@ export function createGame(els) {
       ctx.imageSmoothingEnabled = false;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-
-      if (g.form.crown && g.phase !== 'result' && g.phase !== 'finishing') {
-        ctx.fillStyle = '#ffd166';
-        ctx.fillRect(HEAD[0] - 20, HEAD[1] - 52, 52, 12);
-        for (let k = 0; k < 3; k++) ctx.fillRect(HEAD[0] - 20 + k * 20, HEAD[1] - 68, 12, 16);
-      }
+      const r = g.phase === 'result' ? g.result : null;
 
       // Hit flash: the dragon's silhouette in white, at the contact frame.
       if (now < g.flashUntil) {
@@ -527,7 +546,7 @@ export function createGame(els) {
         ctx.globalAlpha = 1;
       }
       // Cut marks: the cells the last commit matched.
-      if (g.cuts && g.cuts.q && now - g.cuts.t0 < 700 && now - g.cuts.t0 > IMPACT_AT) {
+      if (g.cuts && g.cuts.q && now - g.cuts.t0 < 700 && now - g.cuts.t0 > IMPACT_AT && !r) {
         ctx.globalAlpha = 1 - (now - g.cuts.t0) / 700;
         ctx.fillStyle = '#ffffff';
         let n = 0;
@@ -543,18 +562,26 @@ export function createGame(els) {
       }
 
       // A dragon that was never killed (TIME UP) laughs.
-      if (g.phase === 'result' && g.result && !g.result.dragonDown) {
+      if (r && !r.dragonDown) {
         ctx.font = '48px DotGothic16';
         ctx.fillStyle = '#ff5d73';
         ctx.fillText('HA! HA!', HEAD[0] + 40, HEAD[1] - 70 - Math.abs(Math.sin(now / 160)) * 16);
       }
 
+      drawVillage(ctx, now);
       drawGoblins(ctx, now);
+      drawVillageFire(ctx, now);
       drawHero(ctx, now);
 
-      // Sparks at contact points.
-      g.sparks = g.sparks.filter((s) => now - s.t0 < 220);
+      // Sparks and smoke at contact points.
+      g.sparks = g.sparks.filter((s) => now - s.t0 < (s.smoke ? 500 : 220));
       for (const s of g.sparks) {
+        if (s.smoke) {
+          const p = (now - s.t0) / 500;
+          ctx.fillStyle = `rgba(90, 80, 110, ${0.8 * (1 - p)})`;
+          for (let i = 0; i < 4; i++) ctx.fillRect(Math.round(s.x - 12 + i * 6 + Math.sin(i + now / 90) * 4), Math.round(s.y - 20 - p * 60 - i * 10), 12, 12);
+          continue;
+        }
         const p = (now - s.t0) / 220;
         ctx.fillStyle = p < 0.4 ? '#ffffff' : '#ffd166';
         const r0 = (s.big ? 20 : 12) + p * (s.big ? 70 : 40);
@@ -564,21 +591,17 @@ export function createGame(els) {
         }
       }
 
-      // Numbers above Fiber-kun's head (beside him while he is in the air), below the HUD,
-      // never on his face. At most two lines.
+      // Bite numbers: over the village, where the goblins bite. Never on Fiber-kun or the dragon.
       g.headLog = g.headLog.filter((h) => now - h.t0 < 1300);
-      // Left of Fiber-kun, above the goblins (they are the ones who bite), never on the dragon.
-      const hx = 230;
-      const hy = ARENA.groundY - HERO.size - 52 - (g.fkY > 20 ? 0 : 0);
-      ctx.font = '44px DotGothic16';
+      ctx.font = '40px DotGothic16';
       g.headLog.slice(-2).forEach((h, i, list) => {
         const age = (now - h.t0) / 1300;
         ctx.globalAlpha = 1 - age * age;
-        const y = hy - (list.length - 1 - i) * 50;
+        const y = ROOF_TOP - 130 - (list.length - 1 - i) * 46;
         ctx.fillStyle = '#05071a';
-        ctx.fillText(h.text, hx + 4, y + 4);
+        ctx.fillText(h.text, 172, y + 4);
         ctx.fillStyle = h.color;
-        ctx.fillText(h.text, hx, y);
+        ctx.fillText(h.text, 168, y);
       });
       ctx.globalAlpha = 1;
 
@@ -594,41 +617,91 @@ export function createGame(els) {
         ctx.fillText(f.text, f.x, f.y - age * 40);
       }
       ctx.globalAlpha = 1;
+
+      if (r) drawEnding(ctx, now, r);
     },
   };
 
+  // ---------- the village (your UI) ----------
+  function drawVillage(ctx, now) {
+    const fallen = g.bites > RULES.questFailBites;
+    for (let h = 0; h < HOUSES.length; h++) {
+      const { x, w } = HOUSES[h];
+      // roof: three stepped rows on the 12 px grid
+      ctx.fillStyle = '#8a3a3a';
+      ctx.fillRect(x + 2 * PX, ROOF_TOP, 2 * PX, PX);
+      ctx.fillRect(x + PX, ROOF_TOP + PX, 4 * PX, PX);
+      ctx.fillRect(x, ROOF_TOP + 2 * PX, w, PX);
+      // walls and door
+      ctx.fillStyle = '#c9a27a';
+      ctx.fillRect(x, HOUSE_TOP, w, ARENA.groundY - HOUSE_TOP);
+      ctx.fillStyle = '#5c3a2e';
+      ctx.fillRect(x + 2.5 * PX, HOUSE_TOP + 3 * PX, PX, 2 * PX);
+    }
+    for (let i = 0; i < WINDOWS; i++) {
+      const wr = windowRect(i);
+      ctx.fillStyle = i < g.darkWindows ? '#1a1430' : '#ffd166';
+      ctx.fillRect(wr.x, wr.y, wr.w, wr.h);
+    }
+    // Label, once: what the village stands for (on the grass, never covered).
+    ctx.font = '32px DotGothic16';
+    ctx.fillStyle = '#05071a';
+    ctx.fillText('your UI', 128, ARENA.groundY + 34 + 3);
+    ctx.fillStyle = fallen ? '#ff5d73' : '#ffffff';
+    ctx.fillText('your UI', 126, ARENA.groundY + 34);
+  }
+
+  // The village falls: fire on every roof, from the moment it falls until the round is reset.
+  // Drawn after the goblins, so the dancing goblins never hide it.
+  function drawVillageFire(ctx, now) {
+    if (g.bites > RULES.questFailBites) {
+      for (let h = 0; h < HOUSES.length; h++) {
+        const { x } = HOUSES[h];
+        for (let k = 0; k < 4; k++) {
+          const flick = Math.floor(now / 90 + k * 1.7 + h) % 3;
+          ctx.fillStyle = flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
+          ctx.fillRect(x + 6 + k * 16, ROOF_TOP + PX - flick * 8, PX, 2 * PX + flick * 8);
+          ctx.fillRect(x + 12 + k * 14, HOUSE_TOP - flick * 6, PX, PX);
+        }
+      }
+    }
+  }
+
   function drawGoblins(ctx, now) {
-    // Waiting goblins stand in their slots; the first one is in sword range.
     let slot = 0;
     for (const gb of g.goblins) {
       const frame = GOBLIN[Math.floor(now / 160) % 2];
       let x = GOBLIN_SLOTS[Math.min(slot, GOBLIN_SLOTS.length - 1)];
+      let y = ARENA.groundY - GOBLIN_W;
       let palette = GOBLIN_PALETTE;
       let alpha = 1;
-      if (gb.state === 'wait' || gb.state === 'bite') slot++;
+      if (gb.state === 'wait') slot++;
       if (gb.state === 'bite') {
-        const p = Math.min(1, (now - gb.t0) / 120);
-        x += Math.sin(p * Math.PI * 0.5) * 56; // lunge into Fiber-kun
+        // Run into the village: from its slot to the window it darkens.
+        const w = windowRect(Math.min(gb.window, WINDOWS - 1));
+        const p = Math.min(1, (now - gb.t0) / 160);
+        x = GOBLIN_SLOTS[0] + (w.x - GOBLIN_W / 2 - GOBLIN_SLOTS[0]) * p;
+      }
+      if (gb.state === 'roof') {
+        // Dancing on a roof.
+        const h = HOUSES[gb.house];
+        x = h.x + (h.w - GOBLIN_W) / 2;
+        y = ROOF_TOP - GOBLIN_W - Math.abs(Math.sin(now / 140 + gb.house)) * 14;
       }
       if (gb.state === 'dying') {
         const t = now - gb.t0;
-        if (t < 70) palette = GOBLIN_PALETTE;
-        else if (t < 160) palette = WHITE_GOBLIN; // hit flash at the contact frame
-        else alpha = 1 - (t - 160) / 160;
-        x = GOBLIN_SLOTS[0] - Math.max(0, t - 70) * 0.25; // small knockback
+        if (gb.quiet) alpha = 1 - t / 320;
+        else if (t >= 70 && t < 160) palette = WHITE_GOBLIN; // hit flash at the contact frame
+        else if (t >= 160) alpha = 1 - (t - 160) / 160;
+        if (!gb.quiet) x = GOBLIN_SLOTS[0] - Math.max(0, t - 70) * 0.25; // small knockback
       }
       if (alpha <= 0) continue;
       const img = spriteCanvas(frame, palette, GOBLIN_SCALE);
       ctx.globalAlpha = Math.max(0, alpha);
-      ctx.drawImage(img, Math.round(x), ARENA.groundY - img.height);
-      const gbb = bbox(GOBLIN[0]);
-      reportBox('boss', 'goblin', { x: x + gbb.x * GOBLIN_SCALE, y: ARENA.groundY - img.height + gbb.y * GOBLIN_SCALE, w: gbb.w * GOBLIN_SCALE, h: gbb.h * GOBLIN_SCALE });
+      ctx.drawImage(img, Math.round(x), Math.round(y));
       ctx.globalAlpha = 1;
-      if (gb.state === 'dying' && now - gb.t0 > 160) {
-        ctx.fillStyle = '#d8dcff';
-        const p = (now - gb.t0 - 160) / 160;
-        for (let i = 0; i < 6; i++) ctx.fillRect(x + 48 + Math.cos(i) * p * 50 - 6, ARENA.groundY - 48 + Math.sin(i) * p * 40 - 6, 12, 12);
-      }
+      const gbb = bbox(GOBLIN[0]);
+      if (gb.state === 'wait') reportBox('boss', 'goblin', { x, y: y + gbb.y * GOBLIN_SCALE, w: gbb.w * GOBLIN_SCALE, h: gbb.h * GOBLIN_SCALE });
     }
   }
 
@@ -636,30 +709,27 @@ export function createGame(els) {
     const x = heroX(now);
     const y = ARENA.groundY - HERO.size - Math.round(g.fkY);
     const result = g.phase === 'result' ? g.result : null;
-    // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fillRect(x + 40, ARENA.groundY - 6, HERO.size - 80, 12);
+    ctx.fillRect(x + 32, ARENA.groundY - 6, HERO.size - 64, 12);
 
     if (result && result.questFailed) {
-      // Sits down, eyes closed, sword on the ground: the quest failed.
+      // Kneels, eyes closed. The sword is broken: the hilt in front, the blade on the ground.
       const img = spriteCanvas(FIBER_KUN.rest[0], PALETTE, HERO.scale);
       ctx.drawImage(img, x, ARENA.groundY - img.height);
-      drawSword(ctx, x + HERO.size + 10, ARENA.groundY - 10, 0.02, { scale: SWORD });
+      drawBrokenSword(ctx, x + HERO.size - 8, ARENA.groundY - 40);
       return;
     }
 
     const a = g.action;
     const t = a ? now - a.t0 : Infinity;
     const facingLeft = a && a.kind === 'goblin' && t < 260;
-    const hurtT = now - g.fkHitAt;
-    const hurt = hurtT < 160;
-    const frame = g.fkY > 0 ? FIBER_KUN.walk[0] : hurt ? FACE_HURT : FIBER_KUN.idle[Math.floor(now / 300) % 2];
+    const frame = g.fkY > 0 ? FIBER_KUN.walk[0] : result && result.rank === 'S' ? FACES.smug : FIBER_KUN.idle[Math.floor(now / 300) % 2];
     const img = spriteCanvas(frame, PALETTE, HERO.scale);
     const hb = bbox(FIBER_KUN.idle[0]);
     reportBox('boss', 'hero', { x: x + hb.x * HERO.scale, y: y + hb.y * HERO.scale, w: hb.w * HERO.scale, h: hb.h * HERO.scale });
     const blink = a && a.kind === 'respawn' && t < 420 && Math.floor(t / 60) % 2 === 0;
 
-    // Respawn at root: a light column and a label above the head.
+    // Respawn at root: a light column and a label.
     if (a && a.kind === 'respawn' && t < 700) {
       ctx.globalAlpha = 0.6 * (1 - t / 700);
       ctx.fillStyle = '#9af5ea';
@@ -674,7 +744,7 @@ export function createGame(els) {
     }
 
     ctx.save();
-    if (blink || (hurt && Math.floor(hurtT / 50) % 2 === 1)) ctx.globalAlpha = 0.35;
+    if (blink) ctx.globalAlpha = 0.35;
     if (facingLeft) {
       ctx.translate(x + HERO.size, y);
       ctx.scale(-1, 1);
@@ -690,6 +760,7 @@ export function createGame(els) {
     let angle = 0.3; // at rest: blade forward and a little down, above the ground
     let trail = null;
     if (result && result.rank === 'S') angle = -Math.PI / 2;
+    else if (result) angle = -0.8;
     else if (a && a.kind === 'dash' && t < DASH_MS + SLASH_MS + RETURN_MS) {
       if (t < DASH_MS) angle = -2.3;
       else if (t < DASH_MS + SLASH_MS) {
@@ -716,14 +787,59 @@ export function createGame(els) {
       ctx.restore();
     }
     drawSword(ctx, front, handY, angle, { scale: SWORD, flip: facingLeft });
-    if (result && result.rank === 'S') {
-      ctx.fillStyle = '#ffd166';
-      for (let i = 0; i < 6; i++) {
-        const k = now / 300 + (i * Math.PI) / 3;
-        ctx.fillRect(Math.round(front + Math.cos(k) * 56) - 6, Math.round(handY - 170 + Math.sin(k) * 28) - 6, 12, 12);
+  }
+
+  // ---------- end-of-round scene, readable without text or sound ----------
+  function drawEnding(ctx, now, r) {
+    const age = now - g.resultAt;
+    if (r.rank === 'S' && !r.questFailed) {
+      // Fireworks: fixed positions, a new burst every 450 ms.
+      const spots = [
+        [260, 200, '#ffd166'],
+        [560, 140, '#34e0a1'],
+        [860, 190, '#ff9fb2'],
+        [420, 260, '#4cc9f0'],
+        [720, 250, '#ffd166'],
+      ];
+      for (let k = 0; k < spots.length; k++) {
+        const t = (age + k * 180) % 900;
+        if (t > 600) continue;
+        const [fx, fy, col] = spots[k];
+        const p = t / 600;
+        ctx.globalAlpha = 1 - p;
+        ctx.fillStyle = col;
+        for (let i = 0; i < 12; i++) {
+          const ang = (i / 12) * Math.PI * 2;
+          ctx.fillRect(Math.round(fx + Math.cos(ang) * p * 110) - 6, Math.round(fy + Math.sin(ang) * p * 110) - 6, 12, 12);
+        }
+        ctx.globalAlpha = 1;
       }
     }
+    const title = r.questFailed ? 'QUEST FAILED' : { S: 'PERFECT', A: 'GREAT!', B: 'CLEAR', C: 'QUEST FAILED' }[r.rank];
+    const color = r.questFailed ? '#ff5d73' : r.rank === 'S' ? '#ffd166' : '#ffffff';
+    const pop = Math.min(1, age / 250);
+    ctx.font = `${Math.round(110 * (0.7 + 0.3 * pop))}px DotGothic16`;
+    ctx.fillStyle = '#05071a';
+    ctx.fillText(title, ARENA.w / 2 + 6, 236 + 6);
+    ctx.fillStyle = color;
+    ctx.fillText(title, ARENA.w / 2, 236);
   }
+}
+
+function drawBrokenSword(ctx, x, y) {
+  // hilt with a short broken blade, and the rest of the blade lying on the ground
+  ctx.fillStyle = '#8a5a2b';
+  ctx.fillRect(x - 24, y - 6, 24, 12);
+  ctx.fillStyle = '#ffd166';
+  ctx.fillRect(x, y - 18, 12, 36);
+  ctx.fillStyle = '#120c2c';
+  ctx.fillRect(x + 12, y - 8, 40, 16);
+  ctx.fillStyle = '#e8ecff';
+  ctx.fillRect(x + 12, y - 4, 36, 8);
+  ctx.fillStyle = '#120c2c';
+  ctx.fillRect(x + 80, ARENA.groundY - 14, 92, 14);
+  ctx.fillStyle = '#e8ecff';
+  ctx.fillRect(x + 84, ARENA.groundY - 10, 84, 8);
 }
 
 function setWidth(el, frac) {

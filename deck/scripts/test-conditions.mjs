@@ -23,7 +23,8 @@ const cells = arg('--cells', null);
 const only = arg('--only', 'a,b,c2,c4,d1,d2').split(',');
 const outDir = path.resolve(arg('--out', path.join(root, '.check')));
 mkdirSync(outDir, { recursive: true });
-const url = `${pathToFileURL(path.join(root, 'dist', 'index.html')).href}${work || cells ? `?${[work && `work=${work}`, cells && `cells=${cells}`].filter(Boolean).join('&')}` : ''}#/9/0`;
+const html = arg('--html', path.join(root, 'dist', 'index.html'));
+const url = `${pathToFileURL(html).href}${work || cells ? `?${[work && `work=${work}`, cells && `cells=${cells}`].filter(Boolean).join('&')}` : ''}#/9/0`;
 
 const CONDITIONS = {
   a: { label: 'a · normal headless 1920×1080' },
@@ -61,6 +62,9 @@ for (const key of only) {
     await page.waitForTimeout(2000);
     for (let round = 0; round < 3; round++) {
       if (round) {
+        // round → REPLAY step → next round
+        await page.keyboard.press('PageDown');
+        await page.waitForTimeout(600);
         await page.keyboard.press('PageDown');
         await page.waitForTimeout(2000);
       }

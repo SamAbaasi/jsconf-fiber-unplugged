@@ -31,7 +31,10 @@ export const DragonList = memo(function DragonList({ dragon, query, seq }) {
   for (let i = 0; i < n; i++) cells[i] = <Cell key={i} i={i} q={query} d={dragon} />;
   cells[n] = <RenderTail key="tail" q={query} seq={seq} />;
   return (
-    <div className="dragon-grid" style={{ gridTemplateColumns: `repeat(${dragon.cols}, 4px)`, width: dragon.cols * 4, height: dragon.rows * 4 }}>
+    <div
+      className="dragon-grid"
+      style={{ gridTemplateColumns: `repeat(${dragon.cols}, ${dragon.cellPx}px)`, gridAutoRows: `${dragon.cellPx}px`, width: dragon.cols * dragon.cellPx, height: dragon.rows * dragon.cellPx }}
+    >
       {cells}
     </div>
   );

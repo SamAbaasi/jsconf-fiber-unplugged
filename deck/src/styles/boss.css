@@ -25,8 +25,12 @@
 .boss-fx { pointer-events: none; }
 
 .boss-hydra { position: absolute; transform-origin: 50% 100%; transition: transform 1.2s ease-in, opacity 1.2s ease-in; }
-.boss-hydra.is-collapsed { transform: translateY(120px) rotate(8deg); opacity: 0.2; }
-.boss-hydra.is-retreat { transform: translateX(80px); opacity: 0.6; }
+.boss-hydra { transform-origin: 85% 100%; }
+/* The dragon falls over (it did render): no fade. */
+.boss-hydra.is-collapsed { transform: translate(60px, 70px) rotate(16deg); }
+.boss-hydra.is-retreat { transform: translate(40px, 40px) rotate(8deg); }
+/* QUEST FAILED: the world and the dragon turn grey; the village fire (fx canvas) keeps its colour. */
+.boss-arena.is-grey .boss-layer:not(.boss-fx), .boss-arena.is-grey .boss-hydra { filter: grayscale(0.9) brightness(0.8); transition: filter 600ms; }
 .dragon-kb { transition: none; }
 .dragon-scale { transform-origin: 0 0; }
 /* Columns, rows and size are set inline from the cell count (calibration can change it). */
@@ -48,8 +52,6 @@
 .dragon-grid .c7 { background: #5a1a3a; }
 .dragon-grid .c8 { background: #f0a070; }
 .dragon-grid .c9 { background: #e8dcc0; }
-.dragon-grid .h0 { background: transparent; }
-.dragon-grid .h1 { background: #9cf2c8; }
 /* Same cells, same work; only the colors change per form. */
 .form-2 .dragon-grid .c1 { background: #3f8fc9; }
 .form-2 .dragon-grid .c3 { background: #24608f; }
@@ -105,8 +107,6 @@
 .bo-rules b.g { color: var(--rank-d); }
 .bo-start { margin-top: 24px; font-size: 44px; color: var(--rank-s); }
 .bo-res { display: flex; justify-content: space-between; align-items: center; gap: 30px; }
-.bo-grid { display: grid; grid-template-columns: auto auto; gap: 0 36px; margin-top: 6px; font-size: 32px; color: var(--muted); }
-.bo-grid b { color: #fff; font-weight: 400; text-align: right; }
 .bo-rank { display: flex; flex-direction: column; align-items: center; font-size: 150px; line-height: 0.95; }
 .bo-rank span { font-size: 40px; }
 .bo-rank.rank-S { color: var(--rank-s); }
@@ -124,25 +124,23 @@
 .boss-hits b { color: #7dffc8; font-weight: 400; }
 .boss-pending { width: 170px; font-size: 32px; color: var(--rank-d); }
 
-.boss-fps { left: 1205px; top: 110px; width: 685px; height: 214px; display: grid; grid-template-columns: 200px 1fr; align-items: center; padding: 22px 24px 10px; }
-.boss-fps-num { font-size: 104px; line-height: 1; text-align: center; color: var(--rank-d); }
+.boss-code { left: 1205px; top: 110px; width: 685px; height: 300px; padding: 22px 22px 10px; }
+/* Two big numbers, readable from the back row. */
+.boss-big { left: 1205px; width: 685px; padding: 10px 24px; text-align: center; }
+.boss-big-fps { top: 432px; height: 290px; }
+.boss-big-key { top: 744px; height: 306px; }
+.boss-big-label { font-size: 48px; color: var(--muted); }
+.boss-big-num { font-size: 150px; line-height: 1.1; color: #fff; }
+.boss-fps-num { color: var(--rank-d); }
 .boss-fps-num[data-level='warn'] { color: var(--rank-s); }
 .boss-fps-num[data-level='bad'] { color: var(--rank-a); }
-.boss-fps-graph { width: 400px; height: 110px; border: 2px solid #283270; }
-.boss-fps-worst { grid-column: 1 / -1; font-size: 32px; color: var(--muted); }
-.boss-fps-worst b { color: #fff; font-weight: 400; }
-
-.boss-timeline { left: 1205px; top: 344px; width: 685px; height: 414px; padding: 22px 14px 8px; }
-.boss-timeline canvas { display: block; width: 650px; height: 316px; }
-.boss-legend { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 6px; font-size: 28px; color: var(--muted); }
-.lg::before { content: ''; display: inline-block; width: 18px; height: 14px; margin-right: 6px; vertical-align: -1px; }
-.lg-s::before { background: var(--rank-s); }
-.lg-d::before { background: var(--rank-d); }
-.lg-x::before { background: rgba(255, 93, 115, 0.5); border: 2px solid var(--rank-a); }
-.lg-r::before { background: var(--rank-a); }
-
-.boss-code { left: 1205px; top: 784px; width: 685px; height: 266px; padding: 24px 22px 10px; }
-.boss-code-pre { margin: 0; font-size: 32px; line-height: 1.22; color: #dfe4ff; white-space: pre; }
+.boss-key-num[data-level='good'] { color: var(--rank-d); }
+.boss-key-num[data-level='bad'] { color: var(--rank-a); }
+/* REPLAY step */
+.boss-replay { position: absolute; inset: 0; z-index: 40; background: #070a24; padding: 26px 40px; }
+.boss-replay-title { font-size: 56px; color: #ffd166; margin-bottom: 14px; }
+.boss-replay-canvas { display: block; width: 1840px; height: 840px; }
+.boss-code-pre { margin: 0; font-size: 34px; line-height: 1.3; color: #dfe4ff; white-space: pre; }
 
 /* Calibration (K) */
 .boss-calib { display: none; }
@@ -179,3 +177,27 @@
 .bc-verdict { margin-top: 10px; font-size: 30px; color: var(--ink); }
 .bo-phase { font-size: 26px; color: #c9cdf5; margin-top: 10px; line-height: 1.3; }
 .bc-why { font-size: 20px; color: #c9cdf5; }
+
+.bo-key { margin-top: 40px; display: flex; flex-direction: column; align-items: center; }
+.bo-key span { font-size: 48px; color: var(--muted); }
+.bo-key b { font-size: 140px; font-weight: 400; line-height: 1.1; }
+.bo-key b.bad { color: var(--rank-a); }
+.bo-key b.good { color: var(--rank-d); }
+.bo-mode { display: block; font-size: 44px; color: var(--muted); }
+
+/* Search hits: the same colours, a little lighter (cells keep the ×12 art). */
+.dragon-grid .h.c1 { background: #cf4d69; }
+.dragon-grid .h.c3 { background: #933049; }
+.dragon-grid .h.c4 { background: #f07d95; }
+.dragon-grid .h.c7 { background: #6e2a4c; }
+.dragon-grid .h.c8 { background: #f5b48b; }
+.form-2 .dragon-grid .h.c1 { background: #5aa3d6; }
+.form-2 .dragon-grid .h.c3 { background: #3a77a6; }
+.form-2 .dragon-grid .h.c4 { background: #c0ecff; }
+.form-2 .dragon-grid .h.c7 { background: #2d5f8c; }
+.form-2 .dragon-grid .h.c8 { background: #e6f7ff; }
+.form-3 .dragon-grid .h.c1 { background: #7c68ba; }
+.form-3 .dragon-grid .h.c3 { background: #56458c; }
+.form-3 .dragon-grid .h.c4 { background: #b7a8ef; }
+.form-3 .dragon-grid .h.c7 { background: #4b3a7a; }
+.form-3 .dragon-grid .h.c8 { background: #bdb2e0; }

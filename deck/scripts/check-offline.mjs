@@ -167,7 +167,7 @@ const report = { url, states: [], fontAudit: [], wordsOver40: [], dialogueClick:
     await waitForState(page);
     const name = `slide-${slide.padStart(2, '0')}-step-${step}`;
     await page.screenshot({ path: path.join(outDir, `${name}.png`) });
-    const isBoss = (await page.locator('.boss').count()) > 0;
+    const isBoss = (await page.locator('.boss').count()) > 0 && (await page.locator('.boss-replay').count()) === 0;
     const audit = await auditText(page);
     report.states.push(h);
     if (audit.small.length) report.fontAudit.push({ state: h, boss: isBoss, small: audit.small });
@@ -233,6 +233,8 @@ if (stabilityRuns > 0) {
     for (let step = 0; step < 3; step++) {
       if (step > 0) {
         await page.keyboard.press('PageDown');
+        await page.waitForTimeout(600);
+        await page.keyboard.press('PageDown');
         await page.waitForTimeout(1500);
       }
       const r = await playRound(page, `run ${run} · round ${step + 1}`);
@@ -283,8 +285,11 @@ if (args.includes('--record')) {
       await page.waitForTimeout(1500);
     }
     // Round 1: press ↑ during the fight, so the late jump and its input delay are on video.
-    report.recordedRounds.push(await playRound(page, `round ${step + 1} (while recording)`, { jumpAt: step === 0 ? 2000 : null }));
-    await page.waitForTimeout(2500);
+    report.recordedRounds.push(await playRound(page, `round ${step + 1} (while recording)`, { jumpAt: step === 0 ? 1500 : null }));
+    await page.waitForTimeout(3000);
+    // the REPLAY step of this round
+    await page.keyboard.press('PageDown');
+    await page.waitForTimeout(3500);
   }
   await context.close();
   const file = readdirSync(videoDir).find((f) => f.endsWith('.webm'));
