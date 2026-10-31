@@ -158,7 +158,6 @@ function WhyDud() {
         <div className="yd-skip">never enters the Scheduler queue · no 《Yield》</div>
       </div>
       <div className="yd-line fade-in">{LINES.dudLine.text}</div>
-      <div className="yd-ids">CLAIMS C1 · C2 · A4</div>
     </div>
   );
 }

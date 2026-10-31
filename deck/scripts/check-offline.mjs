@@ -296,6 +296,35 @@ if (args.includes('--record')) {
   if (file) renameSync(path.join(videoDir, file), path.join(outDir, 'boss-rounds.webm'));
 }
 
+// QR on the ending slide: decode it from a real screenshot and compare with the URL.
+{
+  const { default: jsQR } = await import('jsqr');
+  const context = await newContext();
+  const page = await context.newPage();
+  watch(page, 'qr');
+  await page.goto(`${url}#/12/0`);
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(800);
+  const png = await page.screenshot();
+  const decoder = await context.newPage();
+  const img = await decoder.evaluate(async (b64) => {
+    const im = new Image();
+    im.src = `data:image/png;base64,${b64}`;
+    await im.decode();
+    const c = document.createElement('canvas');
+    c.width = im.width;
+    c.height = im.height;
+    const g = c.getContext('2d');
+    g.drawImage(im, 0, 0);
+    return { w: c.width, h: c.height, data: Array.from(g.getImageData(0, 0, c.width, c.height).data) };
+  }, png.toString('base64'));
+  const code = jsQR(Uint8ClampedArray.from(img.data), img.w, img.h);
+  const expected = 'https://www.linkedin.com/in/samabaasi';
+  report.qr = { decoded: code ? code.data : null, expected, ok: !!code && code.data === expected };
+  if (!report.qr.ok) problems.push(`QR on the ending slide decodes to ${JSON.stringify(report.qr.decoded)}, expected ${expected}`);
+  await context.close();
+}
+
 // Scale bible, measured in the page (what was really drawn).
 {
   const rows = [];

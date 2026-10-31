@@ -14,4 +14,7 @@ Every Japanese string in the deck is listed here, so a native speaker can check 
 | 封印 | "Sealed" | STATUS, sealed skill card | Claude (from the brief) | Label on a skill that exists but is switched off. |
 | 外れスキル? No. 《Yield》 won this fight. | "Dud skill? No. Yield won this fight." | Boss result screen, only after a real WIN in round 2 or 3 | Claude (DRAFT) | Mixed Japanese/English on purpose. Does the mix read naturally? |
 | 図鑑 | "Picture book / encyclopedia" (as in a monster encyclopedia) | Bestiary (recap) slide title | Claude (from the brief) | Game-style recap page. Is 図鑑 the natural word for a monster list in games (モンスター図鑑)? |
-| 仲間募集 | "Recruiting party members" / "Looking for companions" | Ending slide title (DRAFT, may be cut) | Claude (from the brief) | Used like a guild notice board. Natural? Saman decides whether to keep the slide. |
+| ~~仲間募集~~ | (removed in Phase 3b) | — | — | Removed: the reviewer noted it means "I am recruiting", the opposite of "Looking for my next guild". Replaced by the ending below. |
+| 「Fiber-kunが 仲間に なりたそうに こちらを見ている！」 | "Fiber-kun is looking at you, wanting to join your party!" | Ending slide, dialogue box | Saman (Phase 3b brief) | Well-known JRPG phrase used as a meme (text only; no game graphics or fonts). Spacing between phrases is deliberate (old JRPG style). Natural with the 「」 and the full-width ！? **Native check pending.** |
+| 仲間にしますか？ | "Will you let him join?" | Ending slide, choice box | Saman (Phase 3b brief) | Full-width ？. **Native check pending.** |
+| はい / いいえ | "Yes" / "No" | Ending slide, choice options (▶ cursor on はい) | Saman (Phase 3b brief) | **Native check pending.** |

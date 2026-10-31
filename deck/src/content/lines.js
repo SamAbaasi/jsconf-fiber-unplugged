@@ -50,12 +50,21 @@ export const LINES = {
   dudTitle: { by: 'draft', text: 'Why a dud skill?', claims: [] },
   dudLine: { by: 'draft', text: 'A click never meets the Scheduler. No yield for it.', claims: ['C2', 'A4'] },
 
-  // Ending (DRAFT)
-  endRecruit: { by: 'draft', text: 'Looking for my next guild', claims: [] },
+  // Ending (text approved by Saman in the Phase 3b brief; Japanese pending native check)
+  endJoin: {
+    by: 'saman',
+    lang: 'ja',
+    text: '「Fiber-kunが 仲間に なりたそうに こちらを見ている！」',
+    sub: '(Fiber-kun is looking at you, wanting to join your party!)',
+    claims: [],
+  },
+  endAsk: { by: 'saman', lang: 'ja', text: '仲間にしますか？', claims: [] },
+  endYes: { by: 'saman', lang: 'ja', text: 'はい', claims: [] },
+  endNo: { by: 'saman', lang: 'ja', text: 'いいえ', claims: [] },
 
   // STATUS window
   statusTwin: { by: 'draft', text: 'My twin: the copy being built.', claims: ['A8'] },
-  statusSkillEffect: { by: 'saman', text: 'Effect: stop working.', claims: ['B1'] },
+  statusSkillEffect: { by: 'saman', text: 'Effect: pause work.', claims: ['B1'] }, // Saman approved the change from "stop working" (Phase 3b)
   statusSkillWhen: { by: 'draft', text: 'Only for: Transition · Retry · Idle', claims: ['A4'] },
   statusSkillNot: { by: 'draft', text: 'Not for clicks, scroll, timers.', claims: ['A4', 'D2'] },
 

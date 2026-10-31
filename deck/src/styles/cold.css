@@ -16,6 +16,7 @@
 .truck-flash { position: absolute; inset: 0; z-index: 15; background: #fff; pointer-events: none; animation: truck-flash 900ms ease-out forwards; }
 @keyframes truck-flash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
 .truck-gate { font-size: 44px; color: #fff; margin-top: 8px; }
+.gate-long { color: #ff5d73; }
 .gate-rank { display: inline-block; min-width: 64px; text-align: center; padding: 0 12px; border: 4px solid currentColor; color: var(--rank-s, #ffd166); }
 .gate-rank.rank-A { color: var(--rank-a, #ff5d73); }
 .gate-rank.rank-B { color: var(--rank-b, #4cc9f0); }

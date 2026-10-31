@@ -10,7 +10,7 @@ import { TEHRAN_FA } from '../sprites/tehranSign.js';
 import { drawSword } from '../sprites/sword.js';
 import { SCALES, bbox, reportBox } from '../sprites/scale.js';
 import { burnIters, ensureCalibrated, itersFor } from '../demo/work.js';
-import { gateRank } from '../demo/gates.js';
+import { isLongTask } from '../demo/gates.js';
 import { play } from '../audio/sfx.js';
 import '../styles/cold.css';
 
@@ -288,8 +288,9 @@ function drawFps(g, fps, lowest) {
   g.textAlign = 'right';
   g.textBaseline = 'alphabetic';
   g.font = '40px DotGothic16';
-  const lines = [[`${fps} fps (last 1 s)`, fps >= 50 ? '#34e0a1' : '#ff5d73']];
-  if (lowest !== null) lines.push([`lowest since the truck: ${lowest} fps`, '#ff5d73']);
+  const lines = [];
+  if (fps !== null) lines.push([`${fps} fps (last 1 s)`, fps >= 50 ? '#34e0a1' : '#ff5d73']);
+  if (lowest !== null) lines.push([`lowest: ${lowest} fps`, '#ff5d73']);
   lines.forEach(([t, col], i) => {
     g.fillStyle = '#05071a';
     g.fillText(t, 1863, 73 + i * 50);
@@ -426,13 +427,14 @@ export function ColdOpen({ step, preview }) {
         }
       }
       drawSignText(g);
-      drawFps(g, s.frames.length, s.lowest ?? null);
+      // During and after the freeze: only the frozen value (DOM) and the lowest fps, no live counter.
+      if (s.frozenMs === null && !s.impactDone) drawFps(g, s.frames.length, null);
+      else if (s.lowest != null) drawFps(g, null, s.lowest);
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
   }, [preview]);
 
-  const rank = frozen !== null ? gateRank(frozen) : null;
   return (
     <div className="truck-slide">
       <canvas ref={canvasRef} width={1920} height={1080} className="truck-canvas pixelated" />
@@ -442,7 +444,7 @@ export function ColdOpen({ step, preview }) {
             FROZEN FRAME <b>{frozen.toLocaleString('en-US')} ms</b>
           </div>
           <div className="truck-gate">
-            [SYSTEM] Gate rank <span className={`gate-rank rank-${rank.rank}`}>{rank.rank}</span> · {rank.rule}
+            [SYSTEM] {isLongTask(frozen) ? <span className="gate-long">LONG TASK · ≥ 50 ms (spec)</span> : 'task under 50 ms'}
           </div>
         </div>
       )}

@@ -13,6 +13,7 @@ import { BossFight } from './BossFight.jsx';
 import { PatchNotes } from './PatchNotes.jsx';
 import { Bestiary } from './Bestiary.jsx';
 import { Ending } from './Ending.jsx';
+import { makeAppendix } from './Appendix.jsx';
 import { RULES, RANK_RULE } from '../demo/game.js';
 
 // Story spine and minute budget: see STORYBOARD.md.
@@ -49,11 +50,11 @@ export const slides = [
     time: '2:15',
     steps: 2,
     Component: Gate,
-    claims: ['L1', 'L2', 'L3', 'C4'],
+    claims: ['L1', 'L2'],
     notes: [
       'DRAFT: Inside the Gate there is only one corridor. JavaScript, layout, paint and your click all walk through it. One at a time.',
       '[CLICK] DRAFT: If a monster gets stuck here, nobody else can pass. Not your click. Not the next frame.',
-      '[CLICK] DRAFT: Every task is a Gate. We give them ranks. Only S is official: 50 milliseconds is a long task. The truck was S rank. (The truck time is the one measured in the cold open.)',
+      '[CLICK] DRAFT: Every task is a Gate. A Gate shows how long it took. 50 milliseconds or more is a long task: the Gate turns red. The truck was a long task. (The truck time is the one measured in the cold open.)',
     ].join('\n'),
   },
   {
@@ -173,12 +174,12 @@ export const slides = [
     id: 'patch',
     title: 'Patch notes',
     time: '22:00',
-    steps: 5,
+    steps: 4,
     Component: PatchNotes,
     claims: ['E1', 'E2', 'G2', 'H2', 'H3', 'C5', 'C10', 'A4', 'B1', 'B2', 'B6'],
     notes: [
       '(Saman) When I wrote Part 9, I got this wrong. Here is what the source actually does.',
-      '[CLICK] DRAFT: startTransition runs the callback now. Only the render waits.',
+      '(row 1 is already on screen) DRAFT: startTransition runs the callback now. Only the render waits.',
       '[CLICK] DRAFT: After a click, useEffect runs before paint.',
       '[CLICK] DRAFT: On the cart click, only CartIcon runs.',
       '[CLICK] DRAFT: 5 ms is per browser task. And only for non-urgent work.',
@@ -191,16 +192,27 @@ export const slides = [
     time: '23:45',
     steps: 0,
     Component: Bestiary,
-    claims: ['L1', 'L2', 'L3', 'A8', 'A2', 'B1', 'C4', 'D1', 'C2', 'A4', 'E4', 'B2', 'D2', 'F1'],
-    notes: 'DRAFT: This is the whole talk on one page. Take a photo.',
+    claims: ['L1', 'L2', 'A8', 'A2', 'B1', 'C4', 'D1', 'C2', 'A4', 'E4', 'B2', 'D2', 'F1'],
+    notes: [
+      'DRAFT: This is the whole talk on one page. Take a photo.',
+      'IDs (not on screen): LONG TASK L1 · Dungeon/Gate L2 L1 · Fiber-kun A8 · Twin A8 · Yield A2 B1 C4 · Quest board D1 · Emergency quest C2 · Expedition A4 E4 · Respawn B2 · Goblin D2 · Dragon A4 E4 F1.',
+    ].join('\n'),
   },
   {
     id: 'ending',
-    title: '仲間募集 (DRAFT)',
+    title: '仲間にしますか？',
     time: '25:00',
-    steps: 0,
+    steps: 1,
     Component: Ending,
     claims: [],
-    notes: 'DRAFT slide: Saman decides whether to use it. Links and QR are placeholders.',
+    notes: [
+      'Fiber-kun wants to join your party. The ▶ cursor blinks on はい. QR = linkedin.com/in/samabaasi (generated at build time, offline).',
+      '[CLICK] はい: Fiber-kun jumps, jingle. Thank you!',
+    ].join('\n'),
   },
 ];
+
+// Appendix with every slide's CLAIMS IDs: hidden by default, shown with ?appendix in the URL.
+if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('appendix')) {
+  slides.push({ id: 'appendix', title: 'Appendix · sources', time: '—', steps: 0, Component: makeAppendix(() => slides), claims: [], notes: 'Hidden by default (open with ?appendix). For Q&A.' });
+}

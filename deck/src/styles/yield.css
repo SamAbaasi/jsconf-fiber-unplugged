@@ -3,7 +3,7 @@
 .yc-label { font-size: 48px; letter-spacing: 0.3em; color: var(--rank-s); }
 .yc-name { font-size: 220px; line-height: 1.1; color: #fff; text-shadow: 10px 10px 0 #120c2c; }
 .yc-effect { font-size: 64px; color: var(--muted); }
-.yc-stamp { position: absolute; right: 230px; top: 230px; padding: 4px 26px; font-size: 80px; color: var(--rank-a); border: 8px solid var(--rank-a); border-radius: 12px; transform: rotate(-10deg); }
+.yc-stamp { position: absolute; right: 120px; top: 150px; padding: 4px 26px; font-size: 80px; color: var(--rank-a); border: 8px solid var(--rank-a); border-radius: 12px; transform: rotate(-10deg); }
 .yc-really { margin-top: 40px; font-size: 56px; color: var(--rank-s); }
 .yc-hero { position: absolute; left: 200px; bottom: 120px; }
 

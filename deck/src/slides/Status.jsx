@@ -30,10 +30,15 @@ function TreeLinks() {
       <path d="M330 92 L140 214" className="st-edge st-faint" />
       <path d="M530 214 L440 96" className="st-edge st-return" markerEnd="url(#st-return)" />
       <path d="M560 288 L560 396" className="st-edge st-child" markerEnd="url(#st-child)" />
-      <path d="M660 250 L716 250" className="st-edge st-sibling" markerEnd="url(#st-sibling)" />
+      <path d="M660 250 L690 250" className="st-edge st-sibling" markerEnd="url(#st-sibling)" />
+      <text x="700" y="262" className="st-label st-sibling">
+        null
+      </text>
       <text x="500" y="150" className="st-label st-return">return</text>
       <text x="580" y="350" className="st-label st-child">child</text>
-      <text x="606" y="214" className="st-label st-sibling">sibling</text>
+      <text x="668" y="206" className="st-label st-sibling">
+        sibling
+      </text>
       {Object.entries(n).map(([name, [x, y]]) => (
         <g key={name}>
           <rect x={x - 100} y={y - 34} width="200" height="68" rx="6" className={name === 'CartIcon' ? 'st-node is-me' : 'st-node'} />

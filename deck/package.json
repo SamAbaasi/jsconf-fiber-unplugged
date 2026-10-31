@@ -6,7 +6,7 @@
   "description": "Interactive slide deck for 'React Fiber Unplugged' (JSConf JP 2026). Runs fully offline.",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/check-scale.mjs && vite build",
+    "build": "node scripts/gen-qr.mjs && node scripts/check-scale.mjs && vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "check": "node scripts/check-claims.mjs && node scripts/check-scale.mjs && node scripts/check-offline.mjs",
     "fonts": "node scripts/gen-fonts.mjs",
@@ -21,6 +21,8 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "6.1.2",
+    "jsqr": "1.4.0",
+    "qrcode-generator": "2.0.4",
     "vite": "8.3.5",
     "vite-plugin-singlefile": "2.3.4"
   }

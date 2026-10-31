@@ -5,7 +5,7 @@ import { play } from '../audio/sfx.js';
 import '../styles/story.css';
 
 // Full-screen LEVEL UP moment at the end of a floor. The skill card shows the real
-// name of the mechanism and its CLAIMS.md rows in small text.
+// name of the mechanism. Its CLAIMS.md rows are in the speaker notes and the appendix.
 export function LevelUp({ from, to, skill, real, effect, stamp, claims = [], preview }) {
   useEffect(() => {
     if (!preview) play('fanfare');
@@ -35,7 +35,6 @@ export function LevelUp({ from, to, skill, real, effect, stamp, claims = [], pre
           <div className="lv-card-real">
             real name: <code>{real}</code>
           </div>
-          <div className="lv-card-claims">CLAIMS {claims.join(' · ')}</div>
         </div>
       </div>
     </div>

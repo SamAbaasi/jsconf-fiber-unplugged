@@ -14,7 +14,7 @@ const ENTRIES = [
 ];
 
 export function PatchNotes({ step, preview }) {
-  useStepSound(step, { 1: 'blip', 2: 'blip', 3: 'blip', 4: 'blip', 5: 'blip' }, preview);
+  useStepSound(step, { 1: 'blip', 2: 'blip', 3: 'blip', 4: 'blip' }, preview);
   return (
     <div className="pn">
       <div className="pn-head">
@@ -23,7 +23,7 @@ export function PatchNotes({ step, preview }) {
       </div>
       <div className="pn-list">
         {ENTRIES.map((e, i) =>
-          step > i ? (
+          step >= i ? (
             <div key={i} className="pn-entry pop-in">
               <span className={i > 0 && ENTRIES[i - 1].part === e.part ? 'pn-part is-same' : 'pn-part'}>{e.part}</span>
               <div className="pn-body">
