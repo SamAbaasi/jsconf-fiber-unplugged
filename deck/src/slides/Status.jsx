@@ -19,7 +19,7 @@ const FIELDS = [
 function TreeLinks() {
   const n = { Header: [400, 60], Logo: [110, 250], Nav: [330, 250], CartIcon: [560, 250], Badge: [560, 440] };
   return (
-    <svg className="st-tree fade-in" width="760" height="500" viewBox="0 0 760 500">
+    <svg className="st-tree fade-in" width="830" height="500" viewBox="0 0 830 500">
       <defs>
         {['child', 'sibling', 'return'].map((k) => (
           <marker key={k} id={`st-${k}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">

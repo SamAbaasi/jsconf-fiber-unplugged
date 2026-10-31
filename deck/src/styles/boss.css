@@ -27,8 +27,8 @@
 .boss-hydra { position: absolute; transform-origin: 50% 100%; transition: transform 1.2s ease-in, opacity 1.2s ease-in; }
 .boss-hydra { transform-origin: 85% 100%; }
 /* The dragon falls over (it did render): no fade. */
-.boss-hydra.is-collapsed { transform: translate(60px, 70px) rotate(16deg); }
-.boss-hydra.is-retreat { transform: translate(40px, 40px) rotate(8deg); }
+.boss-hydra.is-collapsed { transform-origin: 50% 50%; transform: scaleY(-1); } /* on its back, feet up */
+.boss-arena.is-result .hud { opacity: 0; }
 /* QUEST FAILED: the world and the dragon turn grey; the village fire (fx canvas) keeps its colour. */
 .boss-arena.is-grey .boss-layer:not(.boss-fx), .boss-arena.is-grey .boss-hydra { filter: grayscale(0.9) brightness(0.8); transition: filter 600ms; }
 .dragon-kb { transition: none; }
@@ -124,13 +124,14 @@
 .boss-hits b { color: #7dffc8; font-weight: 400; }
 .boss-pending { width: 170px; font-size: 32px; color: var(--rank-d); }
 
-.boss-code { left: 1205px; top: 110px; width: 685px; height: 300px; padding: 22px 22px 10px; }
+.boss-code-line { margin-left: 24px; font-family: var(--font-code); font-size: 34px; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; color: #dfe4ff; white-space: nowrap; }
+.boss-code-line .c { color: #8a90b5; }
 /* Two big numbers, readable from the back row. */
 .boss-big { left: 1205px; width: 685px; padding: 10px 24px; text-align: center; }
-.boss-big-fps { top: 432px; height: 290px; }
-.boss-big-key { top: 744px; height: 306px; }
-.boss-big-label { font-size: 48px; color: var(--muted); }
-.boss-big-num { font-size: 150px; line-height: 1.1; color: #fff; }
+.boss-big-fps { top: 110px; height: 450px; padding-top: 60px; }
+.boss-big-key { top: 590px; height: 460px; padding-top: 60px; }
+.boss-big-label { font-size: 56px; color: var(--muted); }
+.boss-big-num { font-size: 180px; line-height: 1.1; color: #fff; }
 .boss-fps-num { color: var(--rank-d); }
 .boss-fps-num[data-level='warn'] { color: var(--rank-s); }
 .boss-fps-num[data-level='bad'] { color: var(--rank-a); }

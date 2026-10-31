@@ -49,7 +49,7 @@
 .gt-corridor.is-stuck .gt-input { transform: translateX(0); top: 250px; }
 .gt-wait { margin-left: 18px; color: #ff5d73; }
 .gt-monster { position: absolute; left: 560px; top: 40px; width: 560px; height: 300px; background: #ff5d73; border: 8px solid #120c2c; box-shadow: 10px 10px 0 #000; color: #120c2c; font-size: 88px; display: flex; align-items: center; justify-content: center; }
-.gt-caption { position: absolute; left: 80px; right: 80px; top: 760px; font-size: 52px; line-height: 1.35; }
+.gt-caption { position: absolute; left: 160px; right: 80px; top: 820px; font-size: 52px; line-height: 1.35; }
 .gt-src { position: absolute; left: 80px; right: 80px; bottom: 40px; font-size: 30px; color: #8a90b5; }
 /* Gate card: one task, its real duration, the 50 ms line */
 .gt-card { position: absolute; left: 80px; right: 80px; top: 220px; }
@@ -109,7 +109,7 @@
 .end-qr { position: absolute; right: 140px; top: 640px; }
 
 /* Floor label on the built floors (story spine). */
-.floor-chip { position: absolute; left: 40px; top: 4px; z-index: 20; padding: 4px 18px; font-size: 30px; color: #120c2c; background: #ffd166; border: 4px solid #120c2c; box-shadow: 4px 4px 0 #000; }
+.floor-chip { position: absolute; right: 40px; top: 4px; z-index: 20; padding: 4px 18px; font-size: 30px; color: #120c2c; background: #ffd166; border: 4px solid #120c2c; box-shadow: 4px 4px 0 #000; }
 
 /* ---------- APPENDIX (hidden by default) ---------- */
 .ax-slide { position: absolute; inset: 0; background: #0b0c2e; color: #fff; padding: 40px 70px; box-sizing: border-box; }

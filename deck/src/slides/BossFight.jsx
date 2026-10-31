@@ -15,24 +15,9 @@ import { LINES } from '../content/lines.js';
 import '../styles/boss.css';
 
 const MODES = [
-  {
-    key: 'sync',
-    rank: 'S',
-    title: 'no transition',
-    code: ['onChange(e) {', '  const v = e.target.value;', '  setText(v);   // SyncLane', '  setQuery(v);  // SyncLane', '}'],
-  },
-  {
-    key: 'transition',
-    rank: 'D',
-    title: 'useTransition',
-    code: ['onChange(e) {', '  const v = e.target.value;', '  setText(v);   // SyncLane', '  startTransition(() =>', '    setQuery(v)); // Transition', '}'],
-  },
-  {
-    key: 'deferred',
-    rank: 'D',
-    title: 'useDeferredValue',
-    code: ['onChange(e) {', '  setText(e.target.value); // SyncLane', '}', 'q = useDeferredValue(text);', '<DragonList query={q} /> // Transition'],
-  },
+  { key: 'sync', title: 'no transition', code: ['setText(v); setQuery(v);', '// both SyncLane'] },
+  { key: 'transition', title: 'useTransition', code: ['setText(v); startTransition(() => setQuery(v));', ''] },
+  { key: 'deferred', title: 'useDeferredValue', code: ['setText(v); q = useDeferredValue(text);', ''] },
 ];
 
 // Auto-type: four words, one letter every 140 ms, two holds, then clear: 32 steps = 4.48 s.
@@ -267,12 +252,8 @@ export function BossFight({ step }) {
     <div className={`boss mode-${mode.key}`}>
       <header className="boss-top">
         <div className="boss-title">BOSS ROOM</div>
-        <div className="boss-modes">
-          {MODES.map((m, i) => (
-            <div key={m.key} className={`boss-mode rank-${m.rank} ${m.key === mode.key ? 'is-on' : ''}`}>
-              {i + 1} · {m.title}
-            </div>
-          ))}
+        <div className="boss-code-line">
+          {mode.code[0]} <span className="c">{mode.code[1]}</span>
         </div>
         <div className="boss-same">
           same work: {dragon.cells.toLocaleString('en-US')} fibers × {micros} µs
@@ -323,10 +304,7 @@ export function BossFight({ step }) {
         <div className={`boss-pending ${pending ? 'is-on' : ''}`}>{pending ? 'pending…' : ''}</div>
       </div>
 
-      {/* Right side during the fight: the code, then only two big numbers. */}
-      <div className="win boss-code" style={{ position: 'absolute' }}>
-        <pre className="boss-code-pre">{mode.code.join('\n')}</pre>
-      </div>
+      {/* Right side during the fight: only two big numbers. The code is one line in the header. */}
       <div className="win boss-big boss-big-fps" style={{ position: 'absolute' }}>
         <div className="boss-big-label">FPS</div>
         <div className="boss-big-num boss-fps-num" ref={refs.fps}>

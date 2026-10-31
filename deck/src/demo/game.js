@@ -84,10 +84,11 @@ const HOUSES = [12, 92, 172].map((x) => ({ x, w: 6 * PX }));
 const WINDOWS = HOUSES.length * 2;
 const HOUSE_TOP = ARENA.groundY - 5 * PX; // wall top
 const ROOF_TOP = HOUSE_TOP - 3 * PX;
+// Two windows stacked on the left, the door on the right: no "face" layout.
 const windowRect = (i) => {
   const h = HOUSES[i % HOUSES.length];
   const k = Math.floor(i / HOUSES.length);
-  return { x: h.x + (k ? 4 : 1) * PX, y: HOUSE_TOP + PX, w: PX, h: 2 * PX };
+  return { x: h.x + PX, y: HOUSE_TOP + (k ? 3 : 1) * PX, w: 2 * PX, h: PX };
 };
 
 // A small log of landed hits, so tests can find the frames where contact happens.
@@ -198,7 +199,7 @@ export function createGame(els) {
       <div class="bo-mode">${g.modeTitle}</div>
       <div class="bo-rules">
         <div><b class="g">GOBLIN</b> = 1 keystroke</div>
-        <div>late &gt; ${RULES.jankMs} ms → it <b class="r">bites your UI</b></div>
+        <div>late &gt; ${RULES.jankMs} ms → it <b class="r" style="white-space:nowrap">bites your UI</b></div>
         <div><b class="g">DRAGON</b> = the big list</div>
       </div>
       <div class="bo-start blink">type to start</div>`;
@@ -216,7 +217,7 @@ export function createGame(els) {
     if (els.dragonKb) els.dragonKb.style.transform = '';
     if (els.arena) {
       els.arena.style.transform = '';
-      els.arena.classList.remove('is-grey');
+      els.arena.classList.remove('is-grey', 'is-result');
     }
     setText(els.hydraName, g.form.name);
     updateHud();
@@ -274,8 +275,11 @@ export function createGame(els) {
       result: g.result,
     };
     els.onTrace?.(g.round);
-    if (els.hydra && (rank === 'A' || rank === 'B')) els.hydra.classList.replace('is-collapsed', 'is-retreat');
-    if (els.arena && questFailed) els.arena.classList.add('is-grey');
+    g.headLog = [];
+    if (els.arena) {
+      els.arena.classList.add('is-result');
+      if (questFailed) els.arena.classList.add('is-grey');
+    }
     play(rank === 'S' ? 'fanfare' : questFailed ? 'lose' : 'rank');
     if (g.outcome !== 'WIN') setTimeout(() => play('laugh'), 1300);
     renderResult();
@@ -441,7 +445,9 @@ export function createGame(els) {
             g.bites++;
           } else {
             gb.state = 'dying';
-            g.action = { kind: 'goblin', t0: now };
+            // Do not cancel a dash on the dragon that is already under way.
+            const a = g.action;
+            if (!(a && a.kind === 'dash' && now - a.t0 < DASH_MS + SLASH_MS + RETURN_MS)) g.action = { kind: 'goblin', t0: now };
           }
         }
         // The goblin runs into the village; at contact a window goes dark.
@@ -489,7 +495,9 @@ export function createGame(els) {
         g.shake = 8;
         g.shakeAt = now;
         g.sparks.push({ x: CHEST[0], y: CHEST[1], t0: now, big: true });
-        if (imp.dmg > 0 || imp.final) g.floaters.push({ text: imp.final ? 'FINISH!' : `-${imp.dmg}`, x: CHEST[0] + 40, y: CHEST[1] - 90, t0: now, color: imp.final ? '#ffd166' : '#7dffc8', size: imp.final ? 72 : 52 });
+        const late = imp.final && g.bites > RULES.questFailBites;
+        if (imp.dmg > 0 || imp.final)
+          g.floaters.push({ text: imp.final ? (late ? 'TOO LATE' : 'FINISH!') : `-${imp.dmg}`, x: CHEST[0] + 40, y: CHEST[1] - 90, t0: now, color: imp.final ? (late ? '#a3a9c2' : '#ffd166') : '#7dffc8', size: imp.final ? 72 : 52 });
         play('hit');
         if (imp.final) finish(now, 'WIN');
       }
@@ -636,7 +644,7 @@ export function createGame(els) {
       ctx.fillStyle = '#c9a27a';
       ctx.fillRect(x, HOUSE_TOP, w, ARENA.groundY - HOUSE_TOP);
       ctx.fillStyle = '#5c3a2e';
-      ctx.fillRect(x + 2.5 * PX, HOUSE_TOP + 3 * PX, PX, 2 * PX);
+      ctx.fillRect(x + 4 * PX, HOUSE_TOP + 2 * PX, PX, 3 * PX);
     }
     for (let i = 0; i < WINDOWS; i++) {
       const wr = windowRect(i);
@@ -686,7 +694,7 @@ export function createGame(els) {
         // Dancing on a roof.
         const h = HOUSES[gb.house];
         x = h.x + (h.w - GOBLIN_W) / 2;
-        y = ROOF_TOP - GOBLIN_W - Math.abs(Math.sin(now / 140 + gb.house)) * 14;
+        y = ROOF_TOP + PX - GOBLIN_W - Math.abs(Math.sin(now / 140 + gb.house)) * 14;
       }
       if (gb.state === 'dying') {
         const t = now - gb.t0;
@@ -713,9 +721,15 @@ export function createGame(els) {
     ctx.fillRect(x + 32, ARENA.groundY - 6, HERO.size - 64, 12);
 
     if (result && result.questFailed) {
-      // Kneels, eyes closed. The sword is broken: the hilt in front, the blade on the ground.
+      // Defeated: kneels with the head down, gloom lines above, tears; the sword is broken.
       const img = spriteCanvas(FIBER_KUN.rest[0], PALETTE, HERO.scale);
-      ctx.drawImage(img, x, ARENA.groundY - img.height);
+      ctx.drawImage(img, x, ARENA.groundY - img.height + PX);
+      ctx.fillStyle = '#4b4f9e';
+      for (let i = 0; i < 4; i++) ctx.fillRect(x + 36 + i * 36, ARENA.groundY - img.height - 60 + (i % 2) * 12, PX, 48);
+      ctx.fillStyle = '#9af5ea';
+      const drop = (now / 6) % 60;
+      ctx.fillRect(x + 4 * PX, ARENA.groundY - 8 * PX + drop, PX / 2, PX);
+      ctx.fillRect(x + 11 * PX, ARENA.groundY - 8 * PX + ((drop + 30) % 60), PX / 2, PX);
       drawBrokenSword(ctx, x + HERO.size - 8, ARENA.groundY - 40);
       return;
     }
@@ -792,6 +806,22 @@ export function createGame(els) {
   // ---------- end-of-round scene, readable without text or sound ----------
   function drawEnding(ctx, now, r) {
     const age = now - g.resultAt;
+    if (r.questFailed) {
+      // The sky over the village turns red; thick smoke rises from the burning houses.
+      const grad = ctx.createLinearGradient(0, 0, 0, ARENA.groundY);
+      grad.addColorStop(0, 'rgba(200, 40, 30, 0.35)');
+      grad.addColorStop(1, 'rgba(255, 120, 40, 0.15)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, ARENA.w, ARENA.groundY);
+      for (let h = 0; h < HOUSES.length; h++) {
+        for (let k = 0; k < 7; k++) {
+          const t = ((now / 18 + k * 60 + h * 37) % 420) / 420;
+          ctx.fillStyle = `rgba(40, 32, 48, ${0.7 * (1 - t)})`;
+          const sx = HOUSES[h].x + 24 + Math.sin(t * 6 + h) * 18 + t * 60;
+          ctx.fillRect(Math.round(sx / PX) * PX, Math.round((ROOF_TOP - 24 - t * 420) / PX) * PX, 2 * PX, 2 * PX);
+        }
+      }
+    }
     if (r.rank === 'S' && !r.questFailed) {
       // Fireworks: fixed positions, a new burst every 450 ms.
       const spots = [
@@ -820,9 +850,9 @@ export function createGame(els) {
     const pop = Math.min(1, age / 250);
     ctx.font = `${Math.round(110 * (0.7 + 0.3 * pop))}px DotGothic16`;
     ctx.fillStyle = '#05071a';
-    ctx.fillText(title, ARENA.w / 2 + 6, 236 + 6);
+    ctx.fillText(title, ARENA.w / 2 + 6, 140 + 6);
     ctx.fillStyle = color;
-    ctx.fillText(title, ARENA.w / 2, 236);
+    ctx.fillText(title, ARENA.w / 2, 140);
   }
 }
 

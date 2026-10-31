@@ -104,7 +104,7 @@ export const slides = [
     notes: [
       'D1: 31-bit lane mask; Sync = bit 1, InputContinuous = bit 3, Default = bit 5, Transition = bits 8–21, Idle = bit 28. DRAFT: 31 slots. One bit each. Lower bit, more urgent.',
       '[CLICK] D2: click/keydown/input → Sync, scroll/mousemove → Continuous, setTimeout/fetch → Default. DRAFT: The event decides the lane. A click is urgent. A timer is not.',
-      '[CLICK] C2: SyncLane never enters the Scheduler queue; it runs in a microtask. DRAFT: An emergency quest never goes on the board. It runs right now, in a microtask.',
+      '[CLICK] C2: SyncLane never enters the Scheduler queue; it runs in a microtask. DRAFT: An emergency quest never waits in the Scheduler line. It runs right now, in a microtask.',
       '[CLICK] A4, C5, C6: only non-blocking lanes are sliced; 5 ms per browser task (or needsPaint), then yield. DRAFT: Expeditions can rest. Emergency quests cannot.',
       '[CLICK] LEVEL UP Lv3 → Lv4: Respawn (B2).',
     ].join('\n'),

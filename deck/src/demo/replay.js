@@ -58,7 +58,7 @@ function lanes(g, a, t0, t1, top, scale) {
   const x = (t) => LABEL_W + ((t - t0) / (t1 - t0)) * PLOT;
   const clip = ([s, e]) => [Math.max(s, t0), Math.min(e, t1)];
   const rows = { keys: top, react: top + 70, frames: top + 160 };
-  g.font = '34px DotGothic16';
+  g.font = '40px DotGothic16';
   g.textAlign = 'left';
   g.textBaseline = 'middle';
   g.fillStyle = '#c9cdf5';
@@ -78,17 +78,15 @@ function lanes(g, a, t0, t1, top, scale) {
     g.fillStyle = '#34e0a1';
     g.fillRect(x(s), rows.react + 8, Math.max(scale > 1 ? 3 : 1, x(e) - x(s) - (scale > 1 ? 2 : 0)), 44);
   }
+  // thrown-away renders: purple dashed boxes (red is only for long frames and bites)
   for (const iv of a.thrown) {
     const [s, e] = clip(iv);
     if (e <= s) continue;
-    g.strokeStyle = '#ff5d73';
+    g.strokeStyle = '#c792ff';
     g.lineWidth = 4;
+    g.setLineDash([10, 6]);
     g.strokeRect(x(s), rows.react - 4, Math.max(4, x(e) - x(s)), 68);
-    if (scale > 1) {
-      g.fillStyle = '#ff5d73';
-      g.font = '34px DotGothic16';
-      g.fillText('×', x(e) - 22, rows.react - 22);
-    }
+    g.setLineDash([]);
   }
   // frames
   for (const [s, e] of a.gaps) {
@@ -162,11 +160,12 @@ export function drawReplay(canvas, trace, takeaway) {
   lanes(g, a, z0, z1, 436, 2);
   // legend + takeaway
   g.textBaseline = 'middle';
-  g.font = '32px DotGothic16';
+  g.font = '36px DotGothic16';
   const legend = [
     ['#ffd166', 'sync render'],
     ['#34e0a1', '5 ms slice'],
-    ['#ff5d73', 'long frame / bite / thrown away'],
+    ['#c792ff', 'thrown away'],
+    ['#ff5d73', 'late key / long frame'],
   ];
   let lx = LABEL_W;
   for (const [c, t] of legend) {

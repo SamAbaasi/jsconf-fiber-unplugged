@@ -4,7 +4,7 @@ import { Dialogue } from '../ui/Dialogue.jsx';
 import { LINES } from '../content/lines.js';
 import { spriteCanvas } from '../ui/Sprite.jsx';
 import { TRUCK, TRUCK_PALETTE, TRUCK_LABEL_BOX } from '../sprites/truck.js';
-import { FIBER_KUN, PALETTE, DEV, LAPTOP, COFFEE } from '../sprites/fiberkun.js';
+import { FIBER_KUN, PALETTE, DEV, DEV_PALETTE, LAPTOP, COFFEE } from '../sprites/fiberkun.js';
 import { TORII, TORII_PALETTE } from '../sprites/torii.js';
 import { TEHRAN_FA } from '../sprites/tehranSign.js';
 import { drawSword } from '../sprites/sword.js';
@@ -155,7 +155,7 @@ function japan() {
   const g = c.getContext('2d');
   ['#2c3e8f', '#4a5bb0', '#7b78c8', '#c08fc6', '#f2a7b8', '#ffd1b0'].forEach((col, i) => {
     g.fillStyle = col;
-    g.fillRect(0, i * 100, 1920, 101);
+    g.fillRect(0, i * 120, 1920, 121); // 6 × 120 = 720 px: the sky reaches below the hills
   });
   // Mt Fuji: a wide cone with a flat top and a snow cap with jagged edge
   const fx = 520; // left of the torii, so the snow cap stays visible
@@ -169,9 +169,6 @@ function japan() {
       g.fillRect(step8(fx - half), y, step8(half * 2), 8);
     }
   }
-  // snow teeth under the cap
-  g.fillStyle = '#f4f1ff';
-  for (let i = -5; i <= 5; i++) g.fillRect(step8(fx + i * 40 - 8), top + 110, 16, 24 + (Math.abs(i) % 2) * 16);
   // far hills
   for (let x = 0; x < 1920; x += 8) {
     const h = step8(100 + Math.sin(x / 170) * 34 + Math.sin(x / 57) * 10);
@@ -315,10 +312,10 @@ function drawBonk(g, x, y) {
 
 // The developer (previous life): an open laptop in front of him, a coffee in the other hand.
 function drawDev(g, x, ts) {
-  const img = spriteCanvas(DEV[Math.floor(ts / 600) % 2], PALETTE, S);
+  const img = spriteCanvas(DEV[Math.floor(ts / 600) % 2], DEV_PALETTE, S);
   const y = GROUND - img.height;
-  const lap = spriteCanvas(LAPTOP, PALETTE, S);
-  const cup = spriteCanvas(COFFEE, PALETTE, S);
+  const lap = spriteCanvas(LAPTOP, DEV_PALETTE, S);
+  const cup = spriteCanvas(COFFEE, DEV_PALETTE, S);
   g.drawImage(img, x, y);
   g.drawImage(lap, x - 3 * S, y + 7 * S); // open laptop held in front, screen glowing
   g.drawImage(cup, x + 13 * S, y + 7 * S);
@@ -401,7 +398,7 @@ export function ColdOpen({ step, preview }) {
       } else if (s.frozenMs !== null && ts - s.impactEnd < FLY_MS) {
         // Cartoon launch: up and away, spinning. Nobody gets hurt.
         const p = (ts - s.impactEnd) / FLY_MS;
-        const img = spriteCanvas(DEV[0], PALETTE, S);
+        const img = spriteCanvas(DEV[0], DEV_PALETTE, S);
         g.save();
         g.translate(ME_X + 64 + p * 420, GROUND - 120 - Math.sin(p * Math.PI) * 380 - p * 260);
         g.rotate(p * Math.PI * 3);
@@ -418,7 +415,7 @@ export function ColdOpen({ step, preview }) {
         if (p >= 1 && !s.impactDone) {
           s.impactDone = true;
           // Draw the impact frame first: this picture stays on screen while frozen.
-          const img = spriteCanvas(DEV[0], PALETTE, S);
+          const img = spriteCanvas(DEV[0], DEV_PALETTE, S);
           g.drawImage(img, ME_X + 30, GROUND - img.height - 20);
           drawBonk(g, ME_X + 60, GROUND - 200);
           impactTs = ts;
@@ -428,7 +425,11 @@ export function ColdOpen({ step, preview }) {
       }
       drawSignText(g);
       // During and after the freeze: only the frozen value (DOM) and the lowest fps, no live counter.
-      if (s.frozenMs === null && !s.impactDone) drawFps(g, s.frames.length, null);
+      if (!s.mountedAt) s.mountedAt = ts;
+      // The live counter needs a full, settled second of frames: hidden for the first 1.5 s.
+      if (s.frozenMs === null && !s.impactDone) {
+        if (ts - s.mountedAt > 1500) drawFps(g, s.frames.length, null);
+      }
       else if (s.lowest != null) drawFps(g, null, s.lowest);
     };
     raf = requestAnimationFrame(frame);

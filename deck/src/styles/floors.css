@@ -34,7 +34,10 @@
 .ev-lane.is-def { background: #4cc9f0; }
 
 /* emergency quest */
-.em .qb-board { opacity: 0.55; }
+.em-queue { display: flex; align-items: center; gap: 20px; padding: 20px 26px; background: #1d1b4a; border: 5px solid #3b3f7a; font-size: 44px; }
+.em-queue-label { color: #c9cdf5; margin-right: 20px; }
+.em-ticket { padding: 8px 20px; background: #34e0a1; color: #120c2c; }
+.em-ticket.is-def { background: #4cc9f0; }
 .em-path { display: flex; align-items: center; gap: 30px; margin-top: 40px; font-size: 52px; }
 .em-scroll { padding: 10px 26px; background: #ff5d73; color: #120c2c; }
 .em-micro { padding: 10px 26px; border: 5px dashed #ffd166; color: #ffd166; }
@@ -54,7 +57,7 @@
 .wt-node.is-done { background: #34e0a1; border-color: #34e0a1; color: #120c2c; }
 .wt-node.is-now { border-color: #ffd166; color: #ffd166; }
 .wt.is-broken .wt-node.is-done { animation: wt-break 900ms ease-in forwards; animation-delay: calc(var(--i) * 60ms); }
-@keyframes wt-break { 0% { transform: none; opacity: 1; } 100% { transform: translateY(120px) rotate(25deg); opacity: 0; } }
+@keyframes wt-break { 0% { transform: none; opacity: 1; } 100% { transform: translateY(40px) rotate(20deg); opacity: 0; } }
 .rs-key { display: inline-block; margin-top: 40px; padding: 14px 30px; font-size: 52px; background: #ff5d73; color: #120c2c; }
 .rs-respawn { display: inline-block; margin: 20px 0; padding: 10px 30px; font-size: 64px; color: #9af5ea; border: 6px solid #9af5ea; }
 .rs-timer { display: inline-block; margin-top: 40px; padding: 14px 30px; font-size: 52px; background: #4cc9f0; color: #120c2c; }
@@ -68,7 +71,7 @@
 .vs-note { font-size: 44px; color: #ffd166; margin-top: 20px; }
 
 /* transition / deferred / guards */
-.tx-code { margin: 0 0 30px; font: 56px var(--font-code, monospace); color: #dfe4ff; background: #14123a; padding: 24px 34px; border: 5px solid #3b3f7a; width: fit-content; }
+.tx-code { margin: 0 0 30px; font-family: var(--font-code, monospace); font-size: 56px; font-variant-ligatures: none; color: #dfe4ff; background: #14123a; padding: 24px 34px; border: 5px solid #3b3f7a; width: fit-content; }
 .tx-row { font-size: 52px; margin: 18px 0; }
 .tx-tag { display: inline-block; width: 190px; padding: 4px 0; text-align: center; margin-right: 20px; color: #120c2c; }
 .tx-tag.is-now { background: #ffd166; }

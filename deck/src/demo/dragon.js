@@ -78,7 +78,8 @@ function baseShape(x, y) {
     return 1;
   }
   // horns
-  if (segDist(x, y, 20, 13, 31, 2) <= 1.2 || segDist(x, y, 15, 13, 22, 5) <= 1.0) return 9;
+  // two horns that point back and apart (one straight horn read as a unicorn)
+  if (segDist(x, y, 22, 13, 36, 7) <= 1.6 || segDist(x, y, 15, 13, 19, 3) <= 1.5) return 9;
   // wing bones and membrane (behind the body)
   if (segDist(x, y, 62, 38, 66, 4) <= 1.2 || segDist(x, y, 62, 38, 96, 0) <= 1.2 || segDist(x, y, 62, 38, 110, 20) <= 1.2) return 1;
   if (x >= 58 && x <= 112 && y >= wingTop(x) && y <= 40) return 7;
@@ -126,6 +127,15 @@ const artRaw = Array.from({ length: ART.cols * ART.rows }, (_, i) => {
   const dy = Math.min(DESIGN.rows - 1, ay * 2 + 1);
   return ax * 2 + 1 >= DESIGN.cols ? 0 : DESIGN_SHAPE[dy * DESIGN.cols + dx];
 });
+// Spikes along the top of the neck and back (every third art column): a dragon, not a horse.
+for (let ax = 10; ax < 30; ax += 3) {
+  for (let ay = 0; ay < ART.rows; ay++) {
+    const v = artRaw[ay * ART.cols + ax];
+    if (v === 0) continue;
+    if (v === 1 && ay > 0) artRaw[(ay - 1) * ART.cols + ax] = 9;
+    break;
+  }
+}
 const artAt = (x, y) => (x < 0 || y < 0 || x >= ART.cols || y >= ART.rows ? 0 : artRaw[y * ART.cols + x]);
 // Shading on body art pixels: 4 = highlight (open air above), 3 = shade (open air below).
 const ART_SHAPE = artRaw.map((v, i) => {

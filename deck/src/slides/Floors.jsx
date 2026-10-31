@@ -61,7 +61,7 @@ function QuestBoard({ highlight = null, emptySync = false }) {
 export function Floor3({ step, preview }) {
   useStepSound(step, {}, preview);
   if (step >= 4)
-    return <LevelUp from={3} to={4} skill="Respawn" effect="restart from the root" real="interrupt · prepareFreshStack" preview={preview} />;
+    return <LevelUp from={3} to={4} skill="Respawn" effect="start again from the root" real="interrupt" preview={preview} />;
   return (
     <div className="fl-slide">
       <Head title="THE QUEST BOARD" real="Quest board = lanes · 31 bits" />
@@ -89,9 +89,14 @@ export function Floor3({ step, preview }) {
       )}
       {step === 2 && (
         <div className="em fade-in">
-          <QuestBoard emptySync />
+          <div className="em-queue">
+            <span className="em-queue-label">Scheduler line</span>
+            <span className="em-ticket">Transition</span>
+            <span className="em-ticket">Transition</span>
+            <span className="em-ticket is-def">Default</span>
+          </div>
           <div className="em-path">
-            <span className="em-scroll">EMERGENCY · SyncLane</span>
+            <span className="em-scroll">EMERGENCY · Sync</span>
             <span className="ev-arrow">→</span>
             <span className="em-micro">microtask</span>
             <span className="ev-arrow">→</span>
@@ -141,7 +146,7 @@ function WipTree({ done, broken = false, label }) {
 export function Floor4({ step, preview }) {
   useStepSound(step, { 1: 'respawn' }, preview);
   if (step >= 4)
-    return <LevelUp from={4} to={5} skill="Expedition" effect="urgent first, heavy later" real="startTransition · useDeferredValue" preview={preview} />;
+    return <LevelUp from={4} to={5} skill="Lead an expedition" effect="urgent first, heavy later" real="startTransition" preview={preview} />;
   return (
     <div className="fl-slide">
       <Head title="RESPAWN" real="Respawn = interrupt · prepareFreshStack" />
@@ -190,7 +195,7 @@ export function Floor4({ step, preview }) {
 export function Floor5({ step, preview }) {
   useStepSound(step, {}, preview);
   if (step >= 3)
-    return <LevelUp from={5} to={6} skill="BOSS ROOM" effect="the door is open" real="the live demo" preview={preview} />;
+    return <LevelUp from={5} to={6} skill="Enter the boss room" effect="the door is open" real="the live demo" preview={preview} />;
   return (
     <div className="fl-slide">
       <Head title="EXPEDITIONS" real="Expedition = Transition lane" />
@@ -219,7 +224,7 @@ export function Floor5({ step, preview }) {
               render 2 · deferred · <b>new q</b>
             </div>
           </div>
-          <div className="dv-note">inside a transition: one render, no second step</div>
+          <div className="dv-note">inside a transition: only one render</div>
           <div className="fl-line">{LINES.f5Deferred.text}</div>
         </div>
       )}
@@ -228,13 +233,12 @@ export function Floor5({ step, preview }) {
           <div className="gd-title">two 5-second guards</div>
           <div className="gd-row">
             <span className="gd-clock">5000 ms</span>
-            <span>a Transition lane that waits too long expires → no slicing</span>
+            <span>a transition that waits too long: no more breaks</span>
           </div>
           <div className="gd-row">
             <span className="gd-clock">5000 ms</span>
-            <span>a Scheduler task alive too long times out → React renders it in one piece</span>
+            <span>a Scheduler task that runs too long: one piece</span>
           </div>
-          <div className="gd-quote">React’s own comment: “We only check `didTimeout` defensively…”</div>
           <div className="fl-line">{LINES.f5Guards.text}</div>
         </div>
       )}

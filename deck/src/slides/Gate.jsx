@@ -15,7 +15,7 @@ function Corridor({ stuck }) {
     <div className={`gt-corridor ${stuck ? 'is-stuck' : ''}`}>
       <div className="gt-wall gt-wall-top" />
       <div className="gt-wall gt-wall-bottom" />
-      <div className="gt-gate-mark">GATE</div>
+      <div className="gt-gate-mark" />
       <div className="gt-lane">
         {stuck && <div className="gt-monster pop-in">LONG TASK</div>}
         {TRAVELLERS.map((t, i) => (

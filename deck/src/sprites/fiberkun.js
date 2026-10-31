@@ -108,18 +108,20 @@ dev[0] = '........yy......';
 dev[1] = '.......y..y.....';
 dev[2] = '.........y......';
 export const DEV = [[...dev, ...FEET.stand], [...squash(dev), ...FEET.stand]];
+// The previous life is tired and grey-ish; the reborn Fiber-kun is bright. Same shape, new colours.
+export const DEV_PALETTE = { ...PALETTE, b: '#6f9a96', d: '#4c6f6b', l: '#a9c7c3', y: '#b8a878' };
 
-// An open laptop held in front of him, the screen glowing (side view: lid up, base flat).
+// An open laptop held in front of him, seen from the front: a screen glowing on a keyboard base.
 export const LAPTOP = [
-  'kkk.......',
-  'klkk......',
-  'kllk......',
-  'klllk.....',
-  'kllllk....',
-  '.kllllk...',
-  '.kkkkkkkkk',
-  '.kmmmmmmmk',
-  '.kkkkkkkkk',
+  'kkkkkkkkk',
+  'kMMMMMMMk',
+  'kMllllMMk',
+  'kMlkklMMk',
+  'kMllllMMk',
+  'kMMMMMMMk',
+  'kkkkkkkkk',
+  'kmmmmmmmk',
+  'kkkkkkkkk',
 ];
 // A paper coffee cup with a sleeve and steam.
 export const COFFEE = [

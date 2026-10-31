@@ -15,7 +15,7 @@ export function SlideView({ slide, step, preview = false }) {
   return (
     <>
       <Component step={step} preview={preview} />
-      {slide.floor && <div className="floor-chip">{slide.floor}</div>}
+      {slide.floor && step === 0 && <div className="floor-chip">{slide.floor}</div>}
     </>
   );
 }

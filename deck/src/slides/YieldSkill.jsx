@@ -164,7 +164,7 @@ function WhyDud() {
 
 export function YieldSkill({ step, preview }) {
   if (step >= 8)
-    return <LevelUp from={2} to={3} skill="Quest board" effect="see who is urgent" real="lanes (31-bit mask)" claims={['D1']} preview={preview} />;
+    return <LevelUp from={2} to={3} skill="Read the quest board" effect="see who is urgent" real="lanes (31-bit mask)" claims={['D1']} preview={preview} />;
   if (step === 7) return <WhyDud />;
   useStepSound(step, { 0: 'unlock' }, preview);
   if (step === 0) return <SkillCard />;
