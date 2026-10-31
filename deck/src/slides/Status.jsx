@@ -1,173 +1,148 @@
-import { Window } from '../ui/Window.jsx';
-import { AnimatedSprite } from '../ui/Sprite.jsx';
-import { FIBER_KUN, PALETTE } from '../sprites/fiberkun.js';
+import { AnimatedSprite, Sprite } from '../ui/Sprite.jsx';
+import { FACES, FIBER_KUN, PALETTE } from '../sprites/fiberkun.js';
+import { LINES } from '../content/lines.js';
+import { useStepSound } from '../audio/useStepSound.js';
 import '../styles/status.css';
 
-// Real FiberNode fields (ReactFiber.js#L134-L173 at v19.3.1), for the CartIcon fiber
-// from the story: <Header> renders <Logo/>, <Nav/>, <CartIcon/>; CartIcon renders <Badge/>.
-const GROUPS = [
-  {
-    step: 1,
-    name: 'IDENTITY',
-    rows: [
-      ['tag', '0  FunctionComponent'],
-      ['type', 'CartIcon'],
-      ['key', 'null'],
-      ['stateNode', 'null'],
-    ],
-  },
-  {
-    step: 2,
-    name: 'LINKS',
-    rows: [
-      ['return', 'Header'],
-      ['child', 'Badge'],
-      ['sibling', 'null'],
-      ['index', '2'],
-    ],
-  },
-  {
-    step: 3,
-    name: 'TWIN',
-    rows: [['alternate', '⇄ the other copy']],
-  },
-  {
-    step: 4,
-    name: 'WORK',
-    rows: [
-      ['memoizedState', 'Hook { 3 } → next'],
-      ['pendingProps', '{ }'],
-      ['lanes', '0b…0010  SyncLane'],
-      ['childLanes', '0b…0000'],
-      ['flags', 'PerformedWork'],
-    ],
-  },
+// Real FiberNode fields (A8: ReactFiber.js#L134-L173 at v19.3.1) for the CartIcon fiber:
+// <Header> renders <Logo/> <Nav/> <CartIcon/>; CartIcon renders <Badge/>.
+const FIELDS = [
+  { k: 'type', v: 'CartIcon', step: 0 },
+  { k: 'return', v: 'Header', step: 1 },
+  { k: 'child', v: 'Badge', step: 1 },
+  { k: 'sibling', v: 'null', step: 1 },
+  { k: 'alternate', v: '⇄ twin', step: 2 },
+  { k: 'lanes', v: 'SyncLane', step: 3 },
+  { k: 'childLanes', v: '0', step: 3 },
 ];
 
-function TreeLinks({ step }) {
-  // Positions (box centers) in a 640×470 box. Boxes are 156×56.
-  const n = {
-    Header: [330, 52],
-    Logo: [88, 210],
-    Nav: [258, 210],
-    CartIcon: [428, 210],
-    Badge: [428, 380],
-  };
-  const box = (name, hl) => {
-    const [x, y] = n[name];
-    return (
-      <g key={name}>
-        <rect x={x - 78} y={y - 28} width="156" height="56" rx="6" className={hl ? 'tl-node is-me' : 'tl-node'} />
-        <text x={x} y={y + 9} textAnchor="middle" className="tl-text">
-          {name}
-        </text>
-      </g>
-    );
-  };
-  const show = step >= 2;
+function TreeLinks() {
+  const n = { Header: [400, 60], Logo: [110, 250], Nav: [330, 250], CartIcon: [560, 250], Badge: [560, 440] };
   return (
-    <svg className="tree-links" width="640" height="470" viewBox="0 0 640 470">
+    <svg className="st-tree fade-in" width="760" height="500" viewBox="0 0 760 500">
       <defs>
         {['child', 'sibling', 'return'].map((k) => (
-          <marker key={k} id={`arrow-${k}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M0 0L10 5L0 10z" className={`tl-head tl-${k}`} />
+          <marker key={k} id={`st-${k}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M0 0L10 5L0 10z" className={`st-${k}`} />
           </marker>
         ))}
       </defs>
-      {/* Header's own links, drawn faint */}
-      <path d="M270 80 L110 182" className="tl-edge tl-faint" />
-      <path d="M166 210 L180 210" className="tl-edge tl-faint" />
-      <path d="M336 210 L350 210" className="tl-edge tl-faint" />
-      {show && (
-        <g className="fade-in">
-          <path d="M428 238 L428 346" className="tl-edge tl-child" markerEnd="url(#arrow-child)" />
-          <path d="M400 182 L350 86" className="tl-edge tl-return" markerEnd="url(#arrow-return)" />
-          <path d="M506 210 L572 210" className="tl-edge tl-sibling" markerEnd="url(#arrow-sibling)" />
-          <text x="582" y="218" className="tl-null">null</text>
-          <text x="444" y="300" className="tl-label tl-child">child</text>
-          <text x="392" y="122" className="tl-label tl-return">return</text>
-          <text x="500" y="176" className="tl-label tl-sibling">sibling</text>
+      <path d="M330 92 L140 214" className="st-edge st-faint" />
+      <path d="M530 214 L440 96" className="st-edge st-return" markerEnd="url(#st-return)" />
+      <path d="M560 288 L560 396" className="st-edge st-child" markerEnd="url(#st-child)" />
+      <path d="M660 250 L716 250" className="st-edge st-sibling" markerEnd="url(#st-sibling)" />
+      <text x="500" y="150" className="st-label st-return">return</text>
+      <text x="580" y="350" className="st-label st-child">child</text>
+      <text x="606" y="214" className="st-label st-sibling">sibling</text>
+      {Object.entries(n).map(([name, [x, y]]) => (
+        <g key={name}>
+          <rect x={x - 100} y={y - 34} width="200" height="68" rx="6" className={name === 'CartIcon' ? 'st-node is-me' : 'st-node'} />
+          <text x={x} y={y + 12} textAnchor="middle" className="st-node-text">
+            {name}
+          </text>
         </g>
-      )}
-      {Object.keys(n).map((k) => box(k, k === 'CartIcon'))}
+      ))}
     </svg>
   );
 }
 
-function Twins() {
+function Twin() {
   return (
-    <div className="twins fade-in">
-      <div className="twin">
-        <div className="twin-cap">current</div>
-        <div className="twin-box">CartIcon</div>
-        <div className="twin-sub">on screen now</div>
+    <div className="st-twin fade-in">
+      <div className="st-twin-col">
+        <Sprite frame={FIBER_KUN.idle[0]} palette={PALETTE} scale={13} />
+        <div>current</div>
       </div>
-      <div className="twin-arrows">⇄</div>
-      <div className="twin">
-        <div className="twin-cap">work-in-progress</div>
-        <div className="twin-box is-wip">CartIcon</div>
-        <div className="twin-sub">being built</div>
+      <div className="st-twin-arrow">⇄</div>
+      <div className="st-twin-col is-ghost">
+        <Sprite frame={FIBER_KUN.idle[0]} palette={PALETTE} scale={13} flip />
+        <div>work-in-progress</div>
+      </div>
+      <div className="st-twin-cap">{LINES.statusTwin.text}</div>
+    </div>
+  );
+}
+
+function Lanes() {
+  return (
+    <div className="st-lanes fade-in">
+      <div>
+        <code className="st-k">lanes</code> = work waiting <b>here</b>
+      </div>
+      <div>
+        <code className="st-k">childLanes</code> = work waiting <b>below</b>
       </div>
     </div>
   );
 }
 
-export function Status({ step }) {
+function Skills({ step }) {
   return (
-    <div className="status-slide">
-      <Window title="STATUS" className="status-win pop-in">
-        <div className="status-head">
-          <div className="status-portrait">
-            <AnimatedSprite frames={FIBER_KUN.idle} palette={PALETTE} scale={11} fps={2} />
-          </div>
-          <div>
-            <div className="status-name">Fiber-kun</div>
-            <div className="status-class">Class: FiberNode · Lv. 19.3.1</div>
-            <div className="status-class">Job: one unit of work</div>
-          </div>
+    <div className="st-skills">
+      <div className="st-skills-title">SKILLS</div>
+      <div className="st-skill pop-in">
+        <div className="st-skill-name">
+          《Yield》
+          <span className="st-stamp" lang="ja">
+            外れスキル?
+          </span>
         </div>
-        <div className="status-groups">
-          {GROUPS.map((g) => {
-            const known = step >= g.step;
-            return (
-              <div key={g.name} className={`status-group ${step === g.step ? 'is-now' : ''} ${known ? '' : 'is-unknown'}`}>
-                <div className="status-group-name">{g.name}</div>
-                {g.rows.map(([k, v]) => (
-                  <div key={k} className="status-row">
-                    <span className="status-key">{k}</span>
-                    <span className="status-val">{known ? v : '???'}</span>
-                  </div>
-                ))}
+        <div className="st-skill-effect">{LINES.statusSkillEffect.text}</div>
+        {step >= 5 && (
+          <div className="st-tooltip fade-in">
+            <div>{LINES.statusSkillWhen.text}</div>
+            <div className="st-tooltip-not">{LINES.statusSkillNot.text}</div>
+          </div>
+        )}
+      </div>
+      {step >= 6 && (
+        <div className="st-skill is-sealed pop-in">
+          <div className="st-skill-name">
+            <span className="st-seal" lang="ja">
+              封印
+            </span>
+            《Yield · 25 ms》
+          </div>
+          <code className="st-flag">enableThrottledScheduling = false</code>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Status({ step, preview }) {
+  useStepSound(step, { 4: 'unlock', 6: 'unlock' }, preview);
+  const face = step >= 4 && step < 6 ? FACES.shocked : step >= 6 ? FACES.smug : null;
+  return (
+    <div className="st-slide">
+      <div className="win st-win pop-in">
+        <div className="win-title">STATUS</div>
+        <div className="st-left">
+          <div className="st-head">
+            <div className="st-portrait">
+              {face ? <Sprite frame={face} palette={PALETTE} scale={12} /> : <AnimatedSprite frames={FIBER_KUN.idle} palette={PALETTE} scale={12} fps={2} />}
+            </div>
+            <div>
+              <div className="st-name">Fiber-kun</div>
+              <div className="st-class">Lv 19.3.1</div>
+            </div>
+          </div>
+          <div className="st-fields">
+            {FIELDS.map((f) => (
+              <div key={f.k} className={`st-row ${step === f.step ? 'is-now' : ''} ${step >= f.step ? '' : 'is-unknown'}`}>
+                <code className="st-k">{f.k}</code>
+                <code className="st-v">{step >= f.step ? f.v : '???'}</code>
               </div>
-            );
-          })}
-        </div>
-      </Window>
-
-      <div className="status-side">
-        {step >= 2 && step < 3 && <TreeLinks step={step} />}
-        {step === 3 && <Twins />}
-        {step >= 4 && (
-          <div className="status-side-note fade-in">
-            <div>
-              <b className="rank-s-text">lanes</b>: work waiting <i>here</i>
-            </div>
-            <div>
-              <b className="rank-d-text">childLanes</b>: work waiting <i>below</i>
-            </div>
+            ))}
           </div>
-        )}
-        {step < 2 && <TreeLinks step={step} />}
+        </div>
+        <div className="st-right">
+          {step === 1 && <TreeLinks />}
+          {step === 2 && <Twin />}
+          {step === 3 && <Lanes />}
+          {step >= 4 && <Skills step={step} />}
+        </div>
       </div>
-
-      <div className="slide-caption">
-        {step >= 5 ? (
-          <span className="fade-in">A stack frame that React controls. Just a plain object.</span>
-        ) : (
-          <span>&nbsp;</span>
-        )}
-      </div>
-      <div className="src-ref">react-reconciler/src/ReactFiber.js#L134 · v19.3.1</div>
     </div>
   );
 }

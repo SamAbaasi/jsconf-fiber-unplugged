@@ -12,19 +12,20 @@ export const TREE = {
   ],
 };
 
+// Box centers in a 1760×500 SVG. Boxes are 196×64 (rows 160×64).
 export const POS = {
-  App: [450, 50],
-  Header: [190, 190],
-  Results: [590, 190],
-  Footer: [846, 190],
-  Logo: [66, 330],
-  Nav: [190, 330],
-  CartIcon: [314, 330],
-  Badge: [314, 470],
-  'Row 1': [440, 330],
-  'Row 2': [540, 330],
-  'Row 3': [640, 330],
-  'Row 4': [740, 330],
+  App: [833, 44],
+  Header: [352, 180],
+  Results: [1092, 180],
+  Footer: [1565, 180],
+  Logo: [122, 316],
+  Nav: [352, 316],
+  CartIcon: [582, 316],
+  Badge: [582, 450],
+  'Row 1': [814, 316],
+  'Row 2': [999, 316],
+  'Row 3': [1184, 316],
+  'Row 4': [1369, 316],
 };
 
 function link(node, parent) {
@@ -71,21 +72,28 @@ export const UNITS = [];
 
 export const SLICE_MS = 5;
 export const UNIT_COST_MS = 1.25; // diagram value: 4 fibers fill one 5 ms slice
-const U = 650;
+const U = 750;
 const unit = (i) => ({ type: 'unit', i, d: U });
 
+// `narr` = which line from content/lines.js the dialogue box shows from that phase on.
+const withNarr = (phase, narr) => ({ ...phase, narr });
+
 export const STEP_PHASES = {
-  2: [unit(0), unit(1), unit(2), unit(3), { type: 'yield', d: 900 }],
-  3: [{ type: 'browser', label: 'paint', d: 700 }, { type: 'browser', label: 'other tasks', d: 700 }, { type: 'message', d: 800 }],
-  4: [unit(4), unit(5), unit(6), unit(7), { type: 'yield', d: 900 }],
+  2: [withNarr(unit(0), 'yWalk'), unit(1), unit(2), unit(3), { type: 'yield', d: 1400, narr: 'yStop' }],
+  3: [
+    { type: 'browser', label: 'paint', d: 900, narr: 'yBrowser' },
+    { type: 'browser', label: 'other tasks', d: 900 },
+    { type: 'message', d: 1400, narr: 'yResume' },
+  ],
+  4: [unit(4), unit(5), unit(6), unit(7), { type: 'yield', d: 1400, narr: 'yStop' }],
   5: [
-    { type: 'browser', label: 'paint', d: 600 },
-    { type: 'message', d: 500 },
+    { type: 'browser', label: 'paint', d: 700, narr: 'yBrowser' },
+    { type: 'message', d: 900, narr: 'yResume' },
     unit(8),
     unit(9),
     unit(10),
     unit(11),
-    { type: 'done', d: 600 },
+    { type: 'done', d: 600, narr: 'yCommit' },
     { type: 'commit', d: 1000 },
     { type: 'browser', label: 'paint', d: 600 },
   ],
@@ -111,6 +119,7 @@ function initial() {
     message: false,
     committed: false,
     commitFlash: 0,
+    narr: null, // { key, wip } — wip is captured when the line starts
   };
 }
 
@@ -199,6 +208,7 @@ export function stateAt(step, elapsed) {
     for (const phase of STEP_PHASES[k]) {
       if (t <= 0) break;
       const f = Math.min(1, t / phase.d);
+      if (phase.narr) s.narr = { key: phase.narr, wip: s.wip };
       apply(s, phase, f);
       t -= phase.d;
     }

@@ -1,69 +1,51 @@
-/* step 0: popup */
-.skill-popup-wrap { position: absolute; inset: 0; display: grid; place-items: center; }
-.skill-popup { width: 1120px; text-align: center; padding: 56px 48px 48px; }
-.skill-new { font-size: 44px; color: var(--rank-s); letter-spacing: 0.1em; }
-.skill-name { font-size: 140px; line-height: 1.2; color: #fff; text-shadow: 6px 6px 0 #120c2c; }
-.skill-desc { font-size: 40px; color: var(--muted); }
-.skill-hero { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); }
+/* step 0: skill card, full screen */
+.yc { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 45%, #2b2a8a, #070a1f 65%); }
+.yc-label { font-size: 48px; letter-spacing: 0.3em; color: var(--rank-s); }
+.yc-name { font-size: 220px; line-height: 1.1; color: #fff; text-shadow: 10px 10px 0 #120c2c; }
+.yc-effect { font-size: 64px; color: var(--muted); }
+.yc-stamp { position: absolute; right: 230px; top: 230px; padding: 4px 26px; font-size: 80px; color: var(--rank-a); border: 8px solid var(--rank-a); border-radius: 12px; transform: rotate(-10deg); }
+.yc-really { margin-top: 40px; font-size: 56px; color: var(--rank-s); }
+.yc-hero { position: absolute; left: 200px; bottom: 120px; }
 
 /* step 1: code */
-.yield-code { position: absolute; inset: 0; display: flex; gap: 48px; justify-content: center; align-items: center; padding: 0 60px; }
-.yield-code-win { width: 860px; }
-.yield-code-win pre { margin: 0; font-size: 31px; line-height: 1.5; white-space: pre; }
-.yield-code-win mark { background: var(--rank-s); color: #1b1300; padding: 0 4px; border-radius: 4px; }
-.yield-code-win.is-new { border-color: var(--rank-s); }
-.yield-code-note { margin-top: 18px; font-size: 30px; color: var(--muted); }
+.ycode { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 70px; padding: 0 120px; }
+.ycode-win { padding: 40px 48px; }
+.ycode-win pre { margin: 0; font-size: 48px; line-height: 1.45; white-space: pre; }
+.ycode-win mark { background: var(--rank-s); color: #1b1300; padding: 0 6px; border-radius: 6px; }
+.ycode-win.is-new { border-color: var(--rank-s); }
+.ycode-note { text-align: center; font-size: 48px; color: var(--muted); }
 
 /* steps 2–5: the walk */
-.yield-walk { position: absolute; inset: 0; }
-.yw-tree { position: absolute; left: 40px; top: 56px; width: 1000px; height: 640px; padding: 30px 36px; }
-.yw-svg { display: block; }
-.yw-edge { stroke: #39427a; stroke-width: 4; }
-.yw-node rect { fill: #101848; stroke: #5b64a3; stroke-width: 3; }
-.yw-node text { fill: #c9cff5; font: 22px var(--font-code); }
+.yw { position: absolute; inset: 0; }
+.yw-tree { position: absolute; left: 40px; top: 40px; width: 1840px; height: 560px; padding: 30px 36px 20px; }
+.yw-svg { display: block; overflow: visible; }
+.yw-edge { stroke: #39427a; stroke-width: 5; }
+.yw-node rect { fill: #101848; stroke: #5b64a3; stroke-width: 4; }
+.yw-node text { fill: #c9cff5; font: 34px var(--font-code); }
 .yw-node.is-begun rect { stroke: var(--rank-b); }
-.yw-node.is-wip rect { fill: #3a2f05; stroke: var(--rank-s); stroke-width: 6; }
+.yw-node.is-wip rect { fill: #3a2f05; stroke: var(--rank-s); stroke-width: 8; }
 .yw-node.is-wip text { fill: #fff; }
 .yw-node.is-done rect { fill: #0c3b2c; stroke: var(--rank-d); }
 .yw-node.is-done text { fill: #d8fff0; }
 .yw-node.is-committed rect { fill: var(--rank-d); stroke: #fff; }
 .yw-node.is-committed text { fill: #00140c; }
 .yw-fk { position: absolute; }
-.yw-legend { position: absolute; left: 36px; bottom: 18px; display: flex; gap: 26px; font-size: 24px; color: var(--muted); }
-.yw-l::before { content: ''; display: inline-block; width: 22px; height: 16px; margin-right: 8px; border: 3px solid; }
-.yw-l.is-wip::before { border-color: var(--rank-s); background: #3a2f05; }
-.yw-l.is-begun::before { border-color: var(--rank-b); }
-.yw-l.is-done::before { border-color: var(--rank-d); background: #0c3b2c; }
 
-.yw-wip { position: absolute; left: 1080px; top: 56px; width: 800px; height: 150px; }
-.yw-wip-name { font: 64px var(--font-code); color: var(--rank-s); }
+.yw-slice { position: absolute; right: 36px; top: 26px; display: flex; align-items: center; gap: 16px; }
+.yw-slice-label { font-size: 40px; color: var(--rank-d); }
+.yw-bar { width: 420px; height: 44px; border: 4px solid var(--win-line); border-radius: 8px; background: #0a0f36; overflow: hidden; }
+.yw-bar-fill { height: 100%; background: repeating-linear-gradient(90deg, var(--rank-d) 0 26px, #2bbf88 26px 30px); }
+.yw-yield { position: absolute; right: 60px; top: 440px; padding: 10px 30px; font: 56px var(--font-code); color: #fff; background: var(--rank-a); border: 5px solid #fff; border-radius: 12px; white-space: nowrap; }
 
-.yw-slice { position: absolute; left: 1080px; top: 238px; width: 800px; height: 170px; }
-.yw-bar { height: 52px; border: 4px solid var(--win-line); border-radius: 8px; background: #0a0f36; overflow: hidden; }
-.yw-bar-fill { height: 100%; background: repeating-linear-gradient(90deg, var(--rank-d) 0 22px, #2bbf88 22px 26px); }
-.yw-bar-num { margin-top: 8px; font: 30px var(--font-code); color: #fff; }
-.yw-bar-num.is-empty { color: var(--rank-a); }
-
-.yw-loop { position: absolute; left: 1080px; top: 440px; width: 800px; height: 256px; }
-.yw-loop pre { margin: 0; font-size: 28px; line-height: 1.45; }
-.yw-should { margin-top: 10px; font: 30px var(--font-code); color: var(--rank-d); }
-.yw-should.is-true { color: var(--rank-a); }
-.yw-msg { position: absolute; right: 24px; bottom: 20px; padding: 6px 14px; font-size: 26px; color: #1b1300; background: var(--rank-s); border-radius: 8px; }
-
-.yw-thread { position: absolute; left: 40px; top: 730px; width: 1840px; height: 200px; padding: 32px 30px; }
-.yw-segs { display: flex; gap: 6px; height: 74px; align-items: stretch; }
-.yw-seg { display: grid; place-items: center; overflow: hidden; white-space: nowrap; font-size: 24px; border-radius: 6px; }
+.yw-thread { position: absolute; left: 40px; top: 636px; width: 1840px; height: 118px; padding: 22px 30px; }
+.yw-segs { display: flex; gap: 8px; height: 64px; }
+.yw-seg { display: grid; place-items: center; overflow: hidden; white-space: nowrap; font-size: 32px; border-radius: 6px; }
 .yw-seg.is-react { background: var(--react-work); color: #00140c; }
 .yw-seg.is-browser { background: var(--browser); color: #0a0d24; }
 .yw-seg.is-commit { background: #fff; color: #120c2c; }
-.yw-scale { margin-top: 10px; font-size: 22px; color: var(--dim); }
 
-.yw-caption { bottom: 40px; font-size: 38px; }
-
-/* step 6: summary */
-.yield-summary { position: absolute; inset: 0; display: grid; place-items: center; }
-.ys-win { width: 1500px; padding: 56px 64px; }
-.ys-line { font-size: 58px; line-height: 1.5; }
-.ys-line b { color: var(--rank-s); font-weight: 400; }
-.ys-small { font-size: 40px; color: var(--muted); }
-.ys-warn { color: var(--rank-a); }
+/* step 6: summary, full screen */
+.ys { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; background: radial-gradient(circle at 50% 45%, #10503b, #070a1f 65%); }
+.ys-big { font-size: 180px; color: var(--rank-d); text-shadow: 10px 10px 0 #000; }
+.ys-line { font-size: 64px; color: #fff; }
+.ys-catch { font-size: 56px; color: var(--rank-a); }

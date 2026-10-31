@@ -1,58 +1,51 @@
-.status-slide { position: absolute; inset: 0; }
+.st-slide { position: absolute; inset: 0; }
+.st-win { position: absolute; left: 50px; top: 60px; width: 1820px; height: 960px; display: flex; gap: 40px; padding: 48px 56px; }
 
-.status-win { position: absolute; left: 70px; top: 80px; width: 1120px; height: 860px; padding: 40px 48px; }
+.st-left { width: 820px; flex: none; }
+.st-head { display: flex; gap: 36px; align-items: center; margin-bottom: 30px; }
+.st-portrait { width: 230px; height: 230px; display: grid; place-items: center; background: #0a0f36; border: 5px solid var(--win-line); }
+.st-name { font-size: 80px; line-height: 1.1; color: #fff; }
+.st-class { font-size: 36px; color: var(--muted); }
 
-.status-head { display: flex; gap: 36px; align-items: center; margin-bottom: 22px; }
-.status-portrait {
-  width: 210px;
-  height: 210px;
-  display: grid;
-  place-items: center;
-  background: #0a0f36;
-  border: 4px solid var(--win-line);
-  border-radius: 10px;
-}
-.status-name { font-size: 64px; color: #fff; }
-.status-class { font-size: 30px; color: var(--muted); }
+.st-fields { display: flex; flex-direction: column; gap: 6px; }
+.st-row { display: flex; justify-content: space-between; padding: 4px 16px; border: 4px solid transparent; border-radius: 8px; }
+.st-row.is-now { border-color: var(--rank-s); background: rgba(255, 209, 102, 0.1); }
+.st-k { font-size: 44px; color: #8ff0e6; }
+.st-v { font-size: 44px; color: #fff; }
+.st-row.is-unknown .st-v { color: var(--dim); }
 
-.status-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 40px; }
-.status-group { padding: 10px 16px; border-radius: 8px; border: 3px solid transparent; }
-.status-group.is-now { border-color: var(--rank-s); background: rgba(255, 209, 102, 0.08); }
-.status-group-name { font-size: 24px; letter-spacing: 0.12em; color: var(--rank-s); }
-.status-row { display: flex; justify-content: space-between; gap: 18px; font-size: 32px; line-height: 1.35; }
-.status-key { font-family: var(--font-code); color: #8ff0e6; font-size: 29px; }
-.status-val { font-family: var(--font-code); font-size: 27px; color: #fff; text-align: right; white-space: nowrap; }
-.status-group.is-unknown .status-val { color: var(--dim); }
+.st-right { flex: 1; position: relative; }
 
-.status-side { position: absolute; left: 1240px; top: 150px; width: 660px; height: 700px; }
+.st-tree { position: absolute; left: 0; top: 120px; }
+.st-node { fill: #101848; stroke: #8a93c9; stroke-width: 4; }
+.st-node.is-me { fill: #2a2f6b; stroke: var(--rank-s); stroke-width: 6; }
+.st-node-text { fill: #fff; font: 34px var(--font-code); }
+.st-edge { fill: none; stroke-width: 7; }
+.st-faint { stroke: #39427a; stroke-width: 4; }
+.st-child { stroke: var(--rank-d); fill: var(--rank-d); }
+.st-sibling { stroke: var(--rank-b); fill: var(--rank-b); }
+.st-return { stroke: var(--rank-a); fill: var(--rank-a); }
+path.st-return { stroke-dasharray: 14 10; }
+.st-label { stroke: none; font: 34px var(--font-code); }
 
-.tree-links { display: block; margin-top: 60px; }
-.tl-node { fill: #101848; stroke: #8a93c9; stroke-width: 3; }
-.tl-node.is-me { fill: #1d2a6b; stroke: var(--rank-s); stroke-width: 5; }
-.tl-text { fill: #fff; font: 26px var(--font-code); }
-.tl-edge { fill: none; stroke-width: 5; }
-.tl-faint { stroke: #39427a; stroke-width: 3; }
-.tl-child { stroke: var(--rank-d); fill: var(--rank-d); }
-.tl-sibling { stroke: var(--rank-b); fill: var(--rank-b); }
-.tl-return { stroke: var(--rank-a); fill: var(--rank-a); stroke-dasharray: 10 8; }
-.tl-head { stroke: none; }
-.tl-label { stroke: none; font: 24px var(--font-code); }
-.tl-null { fill: var(--muted); font: 22px var(--font-code); }
+.st-twin { position: absolute; inset: 120px 0 0 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; justify-items: center; row-gap: 40px; font-size: 36px; color: var(--muted); }
+.st-twin-col { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.st-twin-col.is-ghost svg { opacity: 0.45; outline: 5px dashed var(--rank-s); outline-offset: 10px; }
+.st-twin-arrow { font-size: 110px; color: var(--rank-s); }
+.st-twin-cap { grid-column: 1 / -1; font-size: 48px; color: #fff; }
 
-.twins { display: flex; align-items: center; gap: 22px; margin-top: 150px; }
-.twin { text-align: center; }
-.twin-cap { font-size: 26px; color: var(--muted); margin-bottom: 8px; }
-.twin-box {
-  padding: 22px 26px;
-  font: 32px var(--font-code);
-  background: #101848;
-  border: 4px solid #8a93c9;
-  border-radius: 8px;
-}
-.twin-box.is-wip { border-color: var(--rank-s); border-style: dashed; }
-.twin-sub { font-size: 24px; color: var(--muted); margin-top: 8px; }
-.twin-arrows { font-size: 64px; color: var(--rank-s); }
+.st-lanes { position: absolute; top: 220px; left: 20px; display: flex; flex-direction: column; gap: 40px; font-size: 48px; }
+.st-lanes b { color: var(--rank-s); font-weight: 400; }
 
-.status-side-note { margin-top: 200px; font-size: 40px; line-height: 1.8; }
-.rank-s-text { color: var(--rank-s); font-weight: 400; font-family: var(--font-code); }
-.rank-d-text { color: var(--rank-d); font-weight: 400; font-family: var(--font-code); }
+.st-skills { position: absolute; inset: 0; }
+.st-skills-title { font-size: 40px; letter-spacing: 0.15em; color: var(--rank-s); margin-bottom: 18px; }
+.st-skill { position: relative; padding: 24px 30px; margin-bottom: 30px; background: #0a0f36; border: 4px solid var(--win-line); border-radius: 10px; }
+.st-skill-name { display: flex; align-items: center; gap: 28px; font-size: 64px; color: #fff; }
+.st-stamp { padding: 0 16px; font-size: 44px; color: var(--rank-a); border: 5px solid var(--rank-a); border-radius: 8px; transform: rotate(-6deg); }
+.st-skill-effect { font-size: 44px; color: var(--muted); }
+.st-tooltip { margin-top: 18px; padding: 16px 22px; font-size: 36px; color: #1b1300; background: var(--rank-s); border-radius: 8px; }
+.st-tooltip-not { color: #6b2b00; }
+.st-skill.is-sealed { border-color: #8a93c9; border-style: dashed; background: repeating-linear-gradient(45deg, #0a0f36 0 24px, #10164a 24px 48px); }
+.st-skill.is-sealed .st-skill-name { color: var(--muted); font-size: 52px; }
+.st-seal { padding: 0 14px; font-size: 48px; color: #fff; background: #6b5bd1; border-radius: 6px; }
+.st-flag { display: block; margin-top: 10px; font-size: 36px; color: var(--rank-a); }
