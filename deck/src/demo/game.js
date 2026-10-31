@@ -50,15 +50,17 @@ const DESIGN_PX = DRAGON_H / DESIGN.rows; // one design-grid cell on screen
 const DRAGON_W = Math.round(DESIGN.cols * DESIGN_PX);
 export const DRAGON_BOX = { x: ARENA.w - DRAGON_W - 16, y: ARENA.groundY - DRAGON_H, w: DRAGON_W, h: DRAGON_H };
 const HERO_SCALE = SCALES.boss.hero;
-const HERO = { homeX: 270, scale: HERO_SCALE, size: 16 * HERO_SCALE, dash: 96 };
+const HERO = { homeX: 270, scale: HERO_SCALE, size: 16 * HERO_SCALE, dash: 160 };
 const SWORD = 1.05; // sword scale, matched to the hero size
-const REACH = 142; // slash arc radius
+const REACH = 148; // slash arc radius = blade tip (142 px × SWORD)
 const GOBLIN_SCALE = SCALES.boss.goblin;
 const GOBLIN_SLOTS = [150, 56, -38];
 const DASH_MS = 90;
 const SLASH_MS = 80;
 const RETURN_MS = 150;
-const IMPACT_AT = DASH_MS + 60;
+// Contact: the moment the blade tip passes the dragon's chest. With the dash above, the hand is
+// at (598, 617) and the chest at (683, 496): angle −0.96 rad, reached 41% into the slash.
+const IMPACT_AT = DASH_MS + Math.round(SLASH_MS * 0.41);
 const HURT_PALETTE = Object.fromEntries(Object.entries(PALETTE).map(([k]) => [k, k === 'k' ? '#5a0a1a' : '#ff5d73']));
 const WHITE_GOBLIN = Object.fromEntries(Object.entries(GOBLIN_PALETTE).map(([k]) => [k, '#ffffff']));
 
