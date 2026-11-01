@@ -221,3 +221,36 @@ The a/b/c2/c4 rows are from the final boss code (confirmation run). The d rows a
 - **FPS:** without capture, rounds 2/3 read 58–61 (green) the whole time. The 39–57 in the videos is capture overhead.
 - **Scale bible:** dragon 492 px = 0.647 × arena H (allowed 0.55–0.65). LINEUP.png updated.
 - **Frame strip:** `node scripts/round-strip.mjs` → `.check/round-strip.png`, 25% frames of each round. It captures at 25% and every 2nd frame to keep the overhead low.
+
+## Full-width arena with the pixel pack (2026-11-01)
+- Saman reversed his earlier choice: the boss room now uses his whole pack, full width (1860 × 760).
+  - Background with the moon, and the cave frame on top.
+  - Castle: intact → cracked → burning. The flag is the health bar.
+  - Goblins: walk, bite, dance, and hit when cut.
+  - Pixel sword (ready / up / strike) and slash_arc.
+  - Round 3 uses the round 《Yield》 shield.
+- **Bottom row:** search box, FPS, and worst key with an INP label. The dragon's HP box is at the top centre; the ready and result cards are in the sky.
+- **Goblins:**
+  - They stand between the castle and Fiber-kun, never between him and the dragon (Saman). He turns left to cut them.
+  - At most 3 on screen (Saman). Dancers stay in front of the castle.
+- **Text:**
+  - "Your users felt every key." replaces the old QUEST FAILED line.
+  - Only the latest BITE line, above the castle.
+  - Hit numbers above the dragon's shoulder.
+- **Tests (build 5d2d760, frozen copy):**
+
+| | normal | 2× throttle |
+|---|---|---|
+| R1 | QUEST FAILED 80/80 | QUEST FAILED 80/80 |
+| R2 | S 80/80 | S 79, A 1 |
+| R3 | S 80/80 | S 78, A 1, **B 1** |
+| total | 240/240 | 239/240 |
+
+  - Round 1 worst key: median 255 ms (213–324) at normal speed, 297 ms (272–393) at 2×.
+  - Auto-type a and c2, 5 runs each: R1 C 5/5, R2/R3 S 5/5.
+  - check-offline: 52 states, no network, no errors.
+  - **The one B:** R3 "slow" mode at 2× (one key every 1.2 s, 15 s rounds). One key was 113 ms late.
+  - **Re-run of R2/R3 slow at 2×, 20 runs each:** 40/40 OK (39 S, 1 A at 53 ms).
+    - In slow rounds the worst frame is long (median 85 ms, max 170 ms), but its split is mostly "other": 54 of 74 ms in the A case, against render 7 and commit 5.
+    - So it is not React's render or commit. It is probably garbage collection or browser work in a long, mostly idle round on a throttled CPU.
+    - A key that lands in such a frame is late. This happens only in the 15 s slow mode at 2×; never at normal speed.
