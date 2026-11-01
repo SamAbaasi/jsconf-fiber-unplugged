@@ -138,18 +138,25 @@ export function BossFight({ step }) {
     warmTimer.current = setTimeout(warmUp, 60);
   };
 
-  // New round whenever the mode changes; coming back from deferred mode, sync the list query.
+  // New round whenever the mode changes. The search box and the list start empty (see below).
   useEffect(() => {
     gameRef.current?.setRound(MODES.indexOf(mode), mode.title);
-    if (mode.key !== 'deferred') setQuery(text);
     clearTimeout(warmTimer.current);
     warmTimer.current = setTimeout(warmUp, 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  // A round or replay step opens: the search box lets go of the keyboard (otherwise A types "a").
+  // Any step opens (round or replay): the search box lets go of the keyboard (otherwise A types
+  // "a"), any auto-type stops, and the search text AND the list query go back to empty, so every
+  // round starts from the same state (same list, same work). seq 0 = not a keystroke. The replay
+  // steps draw from their recorded traces, which this does not touch.
   useEffect(() => {
     inputRef.current?.blur();
+    stopTyping();
+    clearInterval(autoTypeWait.current);
+    clearTimeout(autoTypeWait.current);
+    setText({ v: '', seq: 0 });
+    setQuery({ v: '', seq: 0 });
   }, [step, modeOverride]);
 
   // The clicker (next) during a fight ends the round early instead of changing the slide.

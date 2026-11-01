@@ -102,9 +102,24 @@ const BITE_SPOTS = [CASTLE.x + 230, CASTLE.x + 130, CASTLE.x + 30];
 const DANCE_SPOTS = [CASTLE.x + 40, CASTLE.x + 200];
 // Never more than this many goblins drawn at once (the rest still count; they are just not drawn).
 const MAX_GOBLINS_SHOWN = 3; // Saman: three, not more
-const DASH_MS = 90;
-const SLASH_MS = 80;
-const RETURN_MS = 150;
+// VISUALS ONLY are slowed down by this factor, so a hand-typed round can be followed: the dash
+// and slash, the goblin hit and death, goblins running to the castle, the BITE text, the final hit.
+// Nothing measured depends on these: latency is still event.timeStamp → the first frame after the
+// text commit, and bites / ranks use the same rules.
+const VIS = 1.5;
+const DASH_MS = Math.round(90 * VIS);
+const SLASH_MS = Math.round(80 * VIS);
+const RETURN_MS = Math.round(150 * VIS);
+const GOBLIN_RUN_MS = Math.round(160 * VIS); // from its spot to the castle (then it bites)
+const GOBLIN_STAY_MS = Math.round(360 * VIS); // after this it dances in front of the castle
+const GOBLIN_CUT_MS = Math.round(70 * VIS); // the sword reaches it (goblin_hit)
+const GOBLIN_FADE_AT = Math.round(160 * VIS); // then it fades out…
+const GOBLIN_GONE_MS = Math.round(320 * VIS); // …and is gone
+const GOBLIN_SLASH_MS = Math.round(260 * VIS); // Fiber-kun's turn-and-cut
+const BITE_TEXT_MS = 1500; // "BITE! N ms late" stays this long
+const FLOATER_MS = Math.round(900 * VIS); // -N / FINISH! at the dragon
+// After the final hit lands: the dragon falls, then a pause, then the result card.
+const RESULT_AFTER_MS = 900 + 800;
 // Contact: the middle of the slash, when the crescent is at the chest.
 const IMPACT_AT = DASH_MS + Math.round(SLASH_MS / 2);
 // Where smoke rises when the castle burns (the flames of castle_burning).
@@ -117,13 +132,13 @@ function logHit(type, t) {
   if (hitLog.length > 500) hitLog.shift();
 }
 
-const FALL_MS = 700;
+const FALL_MS = Math.round(700 * VIS);
 const ICE_HOLD = 400; // the frozen ice beam is held this long…
 const ICE_SHATTER = 300; // …then it shatters
 // Rounds 2–3: ice shards fly at this speed, so shards from consecutive slices stay apart.
 const SHARD_SPEED = 2.4; // px per ms
 const SHARD_GAP_MS = 24; // at most one shard per this many ms (slices in the same frame = one shard)
-const HURT_MS = 160; // the hurt pose after each hit
+const HURT_MS = Math.round(160 * VIS); // the hurt pose after each hit
 const formIndex = (form) => Math.max(0, FORMS.indexOf(form));
 
 // Every round's trace (for the REPLAY step): raw events + frame times, by round index.
@@ -562,7 +577,7 @@ export function createGame(els) {
           }
         }
         // The goblin runs to the castle; at contact it bites (smoke, the castle cracks).
-        if (gb.state === 'bite' && !gb.bitten && now - gb.t0 >= 160) {
+        if (gb.state === 'bite' && !gb.bitten && now - gb.t0 >= GOBLIN_RUN_MS) {
           gb.bitten = true;
           g.biteDamage += gb.latency;
           g.sparks.push({ x: BITE_SPOTS[gb.window % BITE_SPOTS.length] + GOBLIN_W / 2, y: ARENA.groundY - GOBLIN_H, t0: now, smoke: true });
@@ -573,7 +588,7 @@ export function createGame(els) {
         }
         // After biting, it stays and dances on the ground in front of the castle (two at most,
         // never on the flames), or vanishes.
-        if (gb.state === 'bite' && now - gb.t0 >= 360) {
+        if (gb.state === 'bite' && now - gb.t0 >= GOBLIN_STAY_MS) {
           const onRoofs = g.goblins.filter((x) => x.state === 'roof').length;
           if (onRoofs < DANCE_SPOTS.length) {
             gb.state = 'roof';
@@ -584,12 +599,12 @@ export function createGame(els) {
             gb.quiet = true;
           }
         }
-        if (gb.state === 'dying' && !gb.cut && !gb.quiet && now - gb.t0 >= 70) {
+        if (gb.state === 'dying' && !gb.cut && !gb.quiet && now - gb.t0 >= GOBLIN_CUT_MS) {
           gb.cut = true;
           logHit('goblin', now);
           play('dodge');
         }
-        if (gb.state === 'dying' && now - gb.t0 >= 320) gb.state = 'dead';
+        if (gb.state === 'dying' && now - gb.t0 >= GOBLIN_GONE_MS) gb.state = 'dead';
       }
       g.goblins = g.goblins.filter((gb) => gb.state !== 'dead');
 
@@ -600,7 +615,7 @@ export function createGame(els) {
         logHit(imp.final ? 'dragon-final' : 'dragon', now);
         g.dragonHp = imp.hp;
         g.hurtUntil = now + HURT_MS; // the hurt pose
-        g.kbUntil = now + 130;
+        g.kbUntil = now + Math.round(130 * VIS);
         g.shake = 8;
         g.shakeAt = now;
         const late = imp.final && g.fallen;
@@ -616,7 +631,7 @@ export function createGame(els) {
         // A pause never ends a round. Only the key count, Enter/clicker, or the safety net do.
         if (now - g.startAt > RULES.maxRoundMs) finish(now, 'TIME UP');
       }
-      if (g.phase === 'finishing' && now - g.finishAt > 900) end(now);
+      if (g.phase === 'finishing' && now - g.finishAt > RESULT_AFTER_MS) end(now);
 
       // Jump physics (manual ↑ only). A long frame moves nothing.
       const step = Math.min(dt, 34) / 1000;
@@ -706,10 +721,10 @@ export function createGame(els) {
 
       // Bite number: only the latest one, rising above the castle (never a stack in a corner,
       // never on Fiber-kun or the dragon).
-      g.headLog = g.headLog.filter((h) => now - h.t0 < 1000);
+      g.headLog = g.headLog.filter((h) => now - h.t0 < BITE_TEXT_MS);
       const h = g.headLog[g.headLog.length - 1];
       if (h) {
-        const age = (now - h.t0) / 1000;
+        const age = (now - h.t0) / BITE_TEXT_MS;
         ctx.globalAlpha = 1 - age * age;
         ctx.font = '44px DotGothic16';
         const bx = CASTLE.x + CASTLE.w / 2 + 40;
@@ -722,9 +737,9 @@ export function createGame(els) {
       ctx.globalAlpha = 1;
 
       // Numbers at dragon impact points.
-      g.floaters = g.floaters.filter((f) => now - f.t0 < 900);
+      g.floaters = g.floaters.filter((f) => now - f.t0 < FLOATER_MS);
       for (const f of g.floaters) {
-        const age = (now - f.t0) / 900;
+        const age = (now - f.t0) / FLOATER_MS;
         ctx.globalAlpha = 1 - age * age;
         ctx.font = `${f.size}px DotGothic16`;
         ctx.fillStyle = '#05071a';
@@ -796,7 +811,7 @@ export function createGame(els) {
         // Run to the castle, then bite it.
         const from = gb.x ?? GOBLIN_SLOTS[0];
         const to = BITE_SPOTS[gb.window % BITE_SPOTS.length];
-        const p = Math.min(1, (now - gb.t0) / 160);
+        const p = Math.min(1, (now - gb.t0) / GOBLIN_RUN_MS);
         x = from + (to - from) * p;
         if (p >= 1) name = 'goblin_bite';
       }
@@ -809,11 +824,11 @@ export function createGame(els) {
       if (gb.state === 'dying') {
         const t = now - gb.t0;
         x = gb.x ?? GOBLIN_SLOTS[0];
-        if (gb.quiet) alpha = 1 - t / 320;
+        if (gb.quiet) alpha = 1 - t / GOBLIN_GONE_MS;
         else {
-          if (t >= 70) name = 'goblin_hit'; // cut at the contact frame
-          if (t >= 160) alpha = 1 - (t - 160) / 160;
-          x -= Math.max(0, t - 70) * 0.25; // small knockback (away from Fiber-kun, to the left)
+          if (t >= GOBLIN_CUT_MS) name = 'goblin_hit'; // cut at the contact frame
+          if (t >= GOBLIN_FADE_AT) alpha = 1 - (t - GOBLIN_FADE_AT) / (GOBLIN_GONE_MS - GOBLIN_FADE_AT);
+          x -= (Math.max(0, t - GOBLIN_CUT_MS) * 0.25) / VIS; // small knockback (away from Fiber-kun, to the left)
         }
       }
       if (alpha <= 0) continue;
@@ -860,7 +875,7 @@ export function createGame(els) {
     const a = g.action;
     const t = a ? now - a.t0 : Infinity;
     // He faces the dragon (right); he turns left to cut a goblin (goblins are on the castle side).
-    const facingLeft = !!(a && a.kind === 'goblin' && t < 260);
+    const facingLeft = !!(a && a.kind === 'goblin' && t < GOBLIN_SLASH_MS);
     const singed = now - g.fkHitAt < 300 && !result; // flinch while the dragon's ice hits him
     const frame = g.fkY > 0 ? FIBER_KUN.walk[0] : singed ? FACES.shocked : result && result.rank === 'S' ? FACES.smug : FIBER_KUN.idle[Math.floor(now / 300) % 2];
     const img = spriteCanvas(frame, PALETTE, HERO.scale);
@@ -906,11 +921,11 @@ export function createGame(els) {
         sword = 'sword_strike';
         slash = 1;
       } else sword = 'sword_strike';
-    } else if (a && a.kind === 'goblin' && t < 260) {
-      if (t < 50) sword = 'sword_up';
+    } else if (a && a.kind === 'goblin' && t < GOBLIN_SLASH_MS) {
+      if (t < 50 * VIS) sword = 'sword_up';
       else {
         sword = 'sword_strike';
-        if (t < 170) slash = 1 - (t - 50) / 120;
+        if (t < 170 * VIS) slash = 1 - (t - 50 * VIS) / (120 * VIS);
       }
     } else if (g.attempting && g.phase === 'fight') sword = 'sword_up'; // stance while React renders the list
     drawAnchored(ctx, sword, SWORD_META[sword].anchor_hilt, hand[0], hand[1], facingLeft);
