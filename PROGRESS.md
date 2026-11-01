@@ -295,3 +295,25 @@ Art, story, text, slide order and timings unchanged.
   - The same machine gave 300–328 ms at 19 µs in the session before. Between sessions it varies by about ±15%, so the band is for the median, set by calibration on the stage laptop.
 - **Round 2 in talk order (round 1 → replay → round 2, 10 runs):** S 10/10. One run had one 65 ms frame (no long task), the rest ≤ 45 ms.
 - **check:** claims, scale and offline (52 states, no network, no errors) all OK.
+
+## Empty search box, slower visuals, action queue (2026-11-01)
+- **dbc29eb:**
+  - Every step (round or replay) resets the search text and the list query to empty, and stops auto-type.
+  - Visuals only are 1.5× slower. The BITE text stays 1.5 s. The result card comes 1.7 s after the final hit.
+- **8b1efa5:** Fiber-kun's actions (a dash with its slash, or a goblin cut) play one after another, each in full.
+  - Waiting actions merge, so fast typing never blurs the fight.
+  - The round's measured end is again the final commit + 130 ms (as in c9f824e) and does not wait for the animation.
+  - Latency, bites and ranks are unchanged.
+- **Test** (`scripts/test-talk.mjs`, talk order round → replay ×3, Chromium, 5 passes each; hand = "tokyo ramens", 250 ms between keys):
+
+| build | box empty at every step | R1 | R2 / R3 | frames > 50 ms in R2+R3 (hand / auto) | console errors |
+|---|---|---|---|---|---|
+| c9f824e (before) | auto 15/15, **hand 0/15** (the bug) | QUEST FAILED 10/10 | S 20/20 | 12 / 4 | 0 |
+| dbc29eb | 30/30 | QUEST FAILED 10/10 | S 20/20 | 11 / 0 | 0 |
+| **8b1efa5** | **30/30** | **QUEST FAILED 10/10** | **S 20/20** | **12 / 2** | **0** |
+
+  - The hand-typed long frames in R2/R3 sit about 235 ms into the round, in every build, including c9f824e.
+  - Cause: with 250 ms between keys, the first list render finishes before the second key, and its commit (~12,000 cells change colour) cannot be interrupted. That is real React work, not new.
+- **Strips:** `.check/round2-hand-250ms.png` and `.check/round2-hand-100ms.png`.
+  - In the 100 ms strip, made while capturing, one real long task (185 ms) shows the ice beam. The worst key was still 38 ms: rank S.
+- **The cold-open truck scene:** unchanged since c996a9a. A frame-by-frame recording of 170460f and dbc29eb shows the same frames.
