@@ -135,7 +135,7 @@ Not new claims; this maps the game to the rows above, so every joke has a source
 | **Goblin** | One keystroke = one urgent update (`setText`). A discrete `input` event → **SyncLane**, rendered in a microtask, never sliced. | D2, C2, A4 |
 | Goblin killed between slices (rounds 2–3) | The heavy list renders in 5 ms slices; between two slices the browser runs the input event, and the keystroke's SyncLane render interrupts the transition. | A2, B1, C1, C4, C5, B2 |
 | Goblin bites (round 1) | Without a transition, the text and the list render in the same sync render, so the text only appears after the whole list. Latency = first frame after the text commit − `event.timeStamp` (measured, not a React claim). | A1, A4 |
-| **Dragon** | The heavy render of 10,000 fibers (`setQuery` in a transition, or the deferred query). | A4, E4, F1 |
+| **Dragon** | The heavy render of 12,144 fibers (`setQuery` in a transition, or the deferred query). | A4, E4, F1 |
 | RESPAWN AT ROOT | A render attempt thrown away before it committed: React restarts the transition from the root. | B2, B6 |
 | Dragon dies on the final commit | The commit that shows the last keystroke; earlier attempts may have been thrown away, only commits count. | B2, E4 |
 
@@ -151,6 +151,7 @@ Not React claims: these are browser facts that the dungeon metaphor stands on. S
 | L2 | **One main thread.** MDN: "The main thread is where a browser processes user events and paints. By default, the browser uses a single thread to run all the JavaScript in your page, as well as to perform layout, reflows, and garbage collection." So JS (React render and commit), style/layout, paint and input events take turns on the same thread. | ✅ | [MDN Glossary: Main thread](https://developer.mozilla.org/en-US/docs/Glossary/Main_thread) (source: `files/en-us/glossary/main_thread/index.md`, line 7). On stage it is the "one narrow corridor". Simplified: the compositor can scroll and run some animations on another thread; the talk does not say "everything". |
 | L3 | ❌ **Removed in Phase 3b.** The E–S gate-rank ladder (our own convention) is gone from the deck: a Gate shows only its measured duration in ms and turns red at ≥ 50 ms (L1). The only letter rank left is the boss room's result rank. | ❌ | — |
 | L4 | **Long Animation Frames (LoAF)** report a frame that is "delayed beyond 50ms", with `renderStart`, `styleAndLayoutStart` and the scripts that ran in it. The deck uses it to split a long frame into script / style+layout / paint time. Chromium only. | ✅ E | [MDN: Long animation frame timing](https://developer.mozilla.org/en-US/docs/Web/API/Performance_API/Long_animation_frame_timing) (line 13); measurements in `deck/.check/phases-*.json`. |
+| L5 | **INP (Interaction to Next Paint)**: 200 ms or less is "good"; above 500 ms is "poor". It measures from the input until the next frame is painted. The deck uses 200 ms only as a **calibration target**: round 1's worst key should be above it, so the bad round is bad by the web's own yardstick. | ⚠️ to verify | web.dev/articles/inp. This session's network blocks web.dev, so check the thresholds and the wording there before saying "INP" on stage. The worst-key number on the slide is measured (event.timeStamp → first frame after the text commit). |
 
 ## Corrections to say on stage ("When I wrote Part N, I got this wrong")
 

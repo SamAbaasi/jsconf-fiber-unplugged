@@ -32,18 +32,20 @@ Why two numbers? On a slow machine the long frames in round 2 are not the render
 2. Press **K**. A checklist appears on the right. Check every line.
 3. Press **K** again. Calibration starts. **Don't touch the keyboard or mouse.**
    - It plays rounds 1, 2, 3 five times (auto-type), about 2–3 minutes per setting.
-   - It starts at 10,000 cells × 12 µs (or your `?work`/`?cells` values).
+   - It starts at 12,144 cells × 17 µs (or your `?work`/`?cells` values).
    - If round 2 is not rank **S** in at least 4 of 5 runs, it looks at round 2's measured worst frames:
-     - mostly **commit + style/layout/paint** → the next smaller DOM: 10,000 → 6,400 → 3,600 → 1,600 cells, with more µs per cell so that cells × µs stays about the same;
-     - mostly **render** → the next smaller DOM at the same µs (less render work too); at 1,600 cells, 2 µs less per cell (the same as the **[** key).
-   - It stops at the first setting where round 2 is S in ≥ 4/5 **and** round 1 is still C in ≥ 4/5.
+     - mostly **commit + style/layout/paint** → the next smaller DOM: 12,144 → 6,831 → 4,345 → 3,036 cells (6 / 8 / 10 / 12 px cells over the same ×12 dragon art), with more µs per cell so that cells × µs stays about the same;
+     - mostly **render** → the next smaller DOM at the same µs (less render work too); at 3,036 cells, 2 µs less per cell (the same as the **[** key).
+   - If round 2 is S but round 1 is not slow enough (not C in ≥ 4/5, or its worst key ≤ **200 ms**, the INP "good" limit, CLAIMS L5), it adds µs per cell in proportion and tries again. If more work then breaks round 2, it goes back to the last setting that passed and says so.
+   - It stops at the first setting where round 2 is S in ≥ 4/5 **and** round 1 is C in ≥ 4/5 **and** round 1's worst key (median of 5) is above 200 ms.
    - One setting for all three rounds, so the comparison stays fair.
 4. When it's done, the chosen setting is shown big, for example **3,600 × 12 µs** (what it chose in a headless test at 4× CPU throttle), with a table of every run and the measured split of round 2's worst frame.
 5. Reuse it: open the deck as `index.html?work=12&cells=3600#/1/0` (your values). Bookmark that URL. The top bar of the boss slide shows "same work: 3,600 fibers × 12 µs".
 
 If the panel says **"No setting works on this machine"**, it shows the reason:
-- *"round 2 is already S, but round 1 is C in only N/5"*: this machine is so fast that round 1 doesn't jank clearly even at the starting value. Try once more with more work: press **]** a few times (it shows the value in the top bar), then **K**, **K** again.
-- *"even with 1,600 cells × N µs, round 2 is S in only N/5"*: the machine (or its screen setup) is too slow for a clean round 2. Check the list above (power, battery saver, other apps), then try again. If it still fails, use the recorded fallback video for that part.
+- *"round 1 is C in only N/5 even at 80 µs"*: this machine is so fast that round 1 doesn't jank clearly even with the most work.
+- *"Round 1's worst key reaches only N ms … using …"*: not a failure. Round 1 is C and round 2 is S, but round 1 stays under 200 ms; the setting is still usable.
+- *"even with 3,036 cells × N µs, round 2 is S in only N/5"*: the machine (or its screen setup) is too slow for a clean round 2. Check the list above (power, battery saver, other apps), then try again. If it still fails, use the recorded fallback video for that part.
 
 **K** or **Esc** cancels a running calibration. **Esc** closes the panel when it's done.
 

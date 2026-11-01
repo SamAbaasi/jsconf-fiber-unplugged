@@ -1,8 +1,9 @@
 // Calibration mode for the presentation laptop (key K on the boss slide).
 // Runs rounds 1–3 five times each with auto-type, with ONE setting (cells × µs per cell) for
 // all three rounds. It stops at the first setting where round 2 is S in ≥ 4/5 AND round 1 is
-// still C in ≥ 4/5. If round 2 fails, it looks at the measured breakdown of round 2's worst
-// frames (demo/phases.js):
+// still C in ≥ 4/5 AND round 1's worst key (median of the 5 runs) is above 200 ms, the INP
+// "good" limit (CLAIMS L5). If round 1 is too fast, it adds work (µs per cell) in proportion.
+// If round 2 fails, it looks at the measured breakdown of round 2's worst frames (demo/phases.js):
 //   - mostly commit + style/layout/paint (DOM size) → fewer cells (next CELL_LEVEL), and more
 //     µs per cell so that cells × µs (the render work) stays about the same;
 //   - mostly render → 2 µs less per cell (the same step as the [ key).
@@ -14,6 +15,11 @@ const STEP = 2; // µs, same as [ and ]
 const MIN_WORK = 2;
 const MAX_WORK = 80;
 const PASS = 4;
+const R1_KEY_MS = 200; // round 1's worst key must be above this (INP "good" limit, CLAIMS L5)
+const median = (a) => {
+  const s = [...a].sort((x, y) => x - y);
+  return s.length ? s[Math.floor(s.length / 2)] : 0;
+};
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -81,6 +87,7 @@ export function runCalibration({ panel, game, setMode, autoType, getWork, setWor
     let cells = getCells();
     let chosen = null;
     let verdict = '';
+    let fallback = null; // the last setting where rounds 1 and 2 passed but round 1 was < 200 ms
     while (!ctl.cancelled) {
       setWork(work);
       setCells(cells);
@@ -110,13 +117,31 @@ export function runCalibration({ panel, game, setMode, autoType, getWork, setWor
       }
       const domHeavy = sum.n === 0 || sum.dom >= sum.render;
       row.why = sum.n ? `render ${Math.round(sum.render / sum.n)} · DOM ${Math.round(sum.dom / sum.n)} ms` : 'no long frame';
-      if (r2S >= PASS && r1C >= PASS) {
+      const r1Key = median(row.results[0].map((r) => r.worstLatencyMs || 0));
+      row.why += ` · R1 key ${r1Key} ms`;
+      if (r2S >= PASS && r1C >= PASS && r1Key > R1_KEY_MS) {
         chosen = { cells, work };
-        verdict = `Round 2 is S in ${r2S}/${RUNS} and round 1 is C in ${r1C}/${RUNS} with ${cells.toLocaleString('en-US')} cells × ${work} µs.`;
+        verdict = `Round 2 is S in ${r2S}/${RUNS}, round 1 is C in ${r1C}/${RUNS} with a worst key of ${r1Key} ms, with ${cells.toLocaleString('en-US')} cells × ${work} µs.`;
         break;
       }
-      if (r2S >= PASS && r1C < PASS) {
-        verdict = `No setting works on this machine: round 2 is already S, but round 1 is C in only ${r1C}/${RUNS}. Less work would make round 1 even smoother. The demo can't show a clear difference here.`;
+      if (r2S >= PASS) {
+        // Round 1 is not slow enough (not C, or its worst key ≤ 200 ms): more work per cell.
+        if (r1C >= PASS) fallback = { cells, work, r1Key };
+        const next = Math.min(MAX_WORK, Math.max(work + STEP, Math.ceil((work * (R1_KEY_MS + 20)) / Math.max(1, r1Key))));
+        if (next > work) {
+          work = next;
+          continue;
+        }
+        chosen = fallback;
+        verdict = fallback
+          ? `Round 1's worst key reaches only ${fallback.r1Key} ms even at ${MAX_WORK} µs; using ${fallback.cells.toLocaleString('en-US')} cells × ${fallback.work} µs.`
+          : `No setting works on this machine: round 1 is C in only ${r1C}/${RUNS} even at ${MAX_WORK} µs.`;
+        break;
+      }
+      if (fallback) {
+        // More work made round 2 fail: go back to the last setting that passed.
+        chosen = fallback;
+        verdict = `Round 1's worst key is only ${fallback.r1Key} ms: more work makes round 2 fail on this machine. Using ${fallback.cells.toLocaleString('en-US')} cells × ${fallback.work} µs.`;
         break;
       }
       const nextCells = CELL_LEVELS[CELL_LEVELS.indexOf(cells) + 1];
@@ -134,6 +159,11 @@ export function runCalibration({ panel, game, setMode, autoType, getWork, setWor
         verdict = `No setting works on this machine: even with ${cells.toLocaleString('en-US')} cells × ${work} µs, round 2 is S in only ${r2S}/${RUNS}.`;
         break;
       }
+    }
+    if (chosen && !ctl.cancelled) {
+      // keep the chosen setting (it may be an earlier row than the last one tried)
+      setWork(chosen.work);
+      setCells(chosen.cells);
     }
     ctl.running = false;
     if (ctl.cancelled) render('cancelled');

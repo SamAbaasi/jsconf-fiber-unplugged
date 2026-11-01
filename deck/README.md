@@ -47,7 +47,7 @@ Story spine and minute plan: [`STORYBOARD.md`](../STORYBOARD.md).
 4. Floor 1 · Lv1 STATUS: fields, links, twin, lanes → LEVEL UP (《Yield》 外れスキル?)
 5. Floor 2 · Lv2 《Yield》: skill card → loop code → tree walk → summary → why a dud → LEVEL UP
 6. Floors 3–5: placeholders with storyboard text (quest board / respawn / expeditions)
-7. Boss room, **live**: goblins (keystrokes) + JANK DRAGON (the list, 10,000 cells by default), three rounds (sync / useTransition / useDeferredValue)
+7. Boss room, **live**: goblins (keystrokes) + JANK DRAGON (the list, 12,144 cells by default), three rounds (sync / useTransition / useDeferredValue)
 8. Patch notes: the five corrections to my articles
 9. 図鑑 bestiary (recap)
 10. 仲間募集 ending (DRAFT)
@@ -59,11 +59,11 @@ On-screen lines live in `src/content/lines.js`, each marked `by: 'saman'` or `by
 Fixed in `src/demo/game.js` (`RULES`, `rankOf`) and shown on screen before every round:
 
 - **Goblin** = one keystroke = one urgent update (`setText`, SyncLane). It appears with the input event and is resolved on the first animation frame after the commit that puts that keystroke's text in the DOM. Latency = that frame's time − `event.timeStamp`. **Over 50 ms, it bites** for that many ms (Fiber-kun HP 4000).
-- **Dragon** = the list (one fiber per cell; 10,000 by default, `?cells=` / calibration can use 6,400, 3,600 or 1,600) (the transition / deferred query). HP = keystrokes of this round the list has not rendered yet. Each real list commit = Fiber-kun dashes in and the slash lands on its chest (flash, knockback, spark, number at the contact point). The **final** commit (the one that shows the last keystroke) kills it. No TIME UP in a winning round.
+- **Dragon** = the list (one fiber per cell; 12,144 by default, `?cells=` / calibration can use 6,831, 4,345 or 3,036) (the transition / deferred query). HP = keystrokes of this round the list has not rendered yet. Each real list commit = Fiber-kun dashes in and the slash lands on its chest (flash, knockback, spark, number at the contact point). The **final** commit (the one that shows the last keystroke) kills it. No TIME UP in a winning round.
 - A round = 12 keys (auto-type or by hand); a pause never ends it; Enter or the clicker ends it early after 3 keys. The castle (your UI) falls at ≥ 50% bites (after 3 keys) → QUEST FAILED. Ranks: S 0 bites · A at most 1 bite (or 10%) and worst key ≤ 100 ms · B < 50% · C = QUEST FAILED.
 - RESPAWN AT ROOT appears only for a real thrown-away render (the list started a new attempt before the last one committed).
 - **A** auto-types five words (~6 s). **↑** jumps and shows `input delay = performance.now() − event.timeStamp` when it is over 50 ms.
-- Same workload every round ("same work: 10,000 fibers × N µs"); only the dragon's look changes.
+- Same workload every round ("same work: 12,144 fibers × N µs"); only the dragon's look changes.
 - **K** = calibration for the presentation laptop (see `RUNBOOK.md`); `?work=N` in the URL sets the work per cell.
 
 No randomness anywhere. All game effects run in the monitor's `requestAnimationFrame` loop, outside React.

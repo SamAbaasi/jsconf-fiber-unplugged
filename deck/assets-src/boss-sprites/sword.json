@@ -1,0 +1,29 @@
+{
+ "sword_ready": {
+  "anchor_hilt": [
+   3,
+   9
+  ],
+  "angle_deg": 45
+ },
+ "sword_up": {
+  "anchor_hilt": [
+   3,
+   12
+  ],
+  "angle_deg": 85
+ },
+ "sword_strike": {
+  "anchor_hilt": [
+   4,
+   3
+  ],
+  "angle_deg": -15
+ },
+ "slash_arc": {
+  "anchor_centre": [
+   12,
+   12
+  ]
+ }
+}

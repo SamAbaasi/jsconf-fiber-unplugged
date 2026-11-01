@@ -7,7 +7,8 @@ import { startMonitor } from '../demo/monitor.js';
 import { createGame, ARENA, DRAGON_BOX, traces } from '../demo/game.js';
 
 const REPLAY_LINES = ['replaySync', 'replayTransition', 'replayDeferred'];
-import { makeDragon, CELL_LEVELS, DEFAULT_CELLS } from '../demo/dragon.js';
+import { makeDragon, dragonCss, CELL_LEVELS, DEFAULT_CELLS } from '../demo/dragon.js';
+const DRAGON_CSS = dragonCss();
 import { startPhaseObserver } from '../demo/phases.js';
 import { drawReplay } from '../demo/replay.js';
 import { runCalibration, showChecklist } from '../demo/calibration.js';
@@ -45,7 +46,7 @@ function initialWork() {
   return settings.microsPerCell;
 }
 
-// Number of cells (DOM size): from ?cells=N if given (set by the calibration), else 10,000.
+// Number of cells (DOM size): from ?cells=N if given (set by the calibration), else 12,144.
 function initialCells() {
   const fromUrl = Number(new URLSearchParams(location.search).get('cells'));
   return CELL_LEVELS.includes(fromUrl) ? fromUrl : DEFAULT_CELLS;
@@ -291,6 +292,7 @@ export function BossFight({ step }) {
         </div>
       </header>
 
+      <style>{DRAGON_CSS}</style>
       <div className="boss-arena" ref={refs.arena}>
         <canvas ref={refs.world} className="boss-layer pixelated" width={ARENA.w} height={ARENA.h} />
         <div className="boss-hydra" ref={refs.hydra} style={{ left: DRAGON_BOX.x, top: DRAGON_BOX.y, width: DRAGON_BOX.w, height: DRAGON_BOX.h }}>

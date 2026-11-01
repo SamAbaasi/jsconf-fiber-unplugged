@@ -23,7 +23,7 @@ import { FIBER_KUN, FACES, PALETTE } from '../sprites/fiberkun.js';
 import { GOBLIN, GOBLIN_PALETTE } from '../sprites/goblin.js';
 import { drawSword } from '../sprites/sword.js';
 import { spriteCanvas } from '../ui/Sprite.jsx';
-import { makeDragon, fallenArt, kneelingArt, breathArt, BREATH_DROP, DESIGN, DESIGN_PX, DRAGON_PX, DRAGON_POINTS, DEFAULT_CELLS } from './dragon.js';
+import { makeDragon, poseCanvas, ART_PX, DRAGON_PX, DRAGON_POINTS, BASELINE_ROW, DEFAULT_CELLS } from './dragon.js';
 import { SCALES, bbox, reportBox } from '../sprites/scale.js';
 import { analyzePhases } from './phases.js';
 import { eventLog } from '../instrument/eventLog.js';
@@ -58,28 +58,30 @@ export const FORMS = [
 
 // Proportions come from the scale bible (sprites/scale.js; checked by scripts/check-scale.mjs).
 // Fiber-kun, the goblins and the dragon are all drawn on the same ×12 pixel grid.
-export const ARENA = { w: 1150, h: SCALES.boss.arenaH, groundY: 690 };
+export const ARENA = { w: 1330, h: SCALES.boss.arenaH, groundY: 690 };
 const DRAGON_W = DRAGON_PX.w;
 const DRAGON_H = DRAGON_PX.h;
 // Right edge 24 px inside the arena (5 px border), so the 12 px knockback never clips the tail.
-// The shape uses design columns 0…103 (the grid is wider; its empty right part is off-screen).
-const SHAPE_W = 104 * DESIGN_PX;
-export const DRAGON_BOX = { x: ARENA.w - 5 - SHAPE_W - 24, y: ARENA.groundY - DRAGON_H, w: DRAGON_W, h: DRAGON_H };
+// The art uses columns 3…58 of its 66; the feet (BASELINE_ROW) stand on the ground.
+const SHAPE_W = 59 * ART_PX;
+export const DRAGON_BOX = { x: ARENA.w - 5 - SHAPE_W - 24, y: ARENA.groundY - (BASELINE_ROW + 1) * ART_PX, w: DRAGON_W, h: DRAGON_H };
 const HERO_SCALE = SCALES.boss.hero;
 const HERO_SIZE = 16 * HERO_SCALE;
 const SWORD = 1.05; // sword scale, matched to the hero size
 const REACH = 148; // slash arc radius = blade tip (142 px × SWORD)
-const HERO_HOME = 249; // Fiber-kun's centre at 30% of the arena width (same in every round)
+const HERO_HOME = 216; // Fiber-kun's left edge, just right of the castle (same in every round)
 // Dash so the blade tip passes the dragon's chest at the contact frame (computed, not tuned).
-const CHEST = [DRAGON_BOX.x + DRAGON_POINTS.chest[0] * DESIGN_PX, DRAGON_BOX.y + DRAGON_POINTS.chest[1] * DESIGN_PX];
-const HEAD = [DRAGON_BOX.x + DRAGON_POINTS.head[0] * DESIGN_PX, DRAGON_BOX.y + DRAGON_POINTS.head[1] * DESIGN_PX];
+const CHEST = [DRAGON_BOX.x + DRAGON_POINTS.chest[0] * ART_PX, DRAGON_BOX.y + DRAGON_POINTS.chest[1] * ART_PX];
+const HEAD = [DRAGON_BOX.x + DRAGON_POINTS.head[0] * ART_PX, DRAGON_BOX.y + DRAGON_POINTS.head[1] * ART_PX];
 const HAND_Y = ARENA.groundY - HERO_SIZE + HERO_SIZE * 0.62;
 const HAND_X = CHEST[0] - Math.sqrt(REACH ** 2 - (HAND_Y - CHEST[1]) ** 2);
 const CONTACT_ANGLE = Math.atan2(CHEST[1] - HAND_Y, CHEST[0] - HAND_X);
 const HERO = { homeX: HERO_HOME, scale: HERO_SCALE, size: HERO_SIZE, dash: Math.round(HAND_X - (HERO_HOME + HERO_SIZE - 24)) };
 const GOBLIN_SCALE = SCALES.boss.goblin;
 const GOBLIN_W = 8 * GOBLIN_SCALE;
-const GOBLIN_SLOTS = [452, 508]; // waiting goblins: right of Fiber-kun; late ones run past him to the castle
+const GOBLIN_SLOTS = [420, 500]; // waiting goblins: right of Fiber-kun; late ones run past him to the castle
+// Never more than this many goblins on screen at once (the rest still count, they are just not drawn).
+const MAX_GOBLINS_SHOWN = 3;
 const DASH_MS = 90;
 const SLASH_MS = 80;
 const RETURN_MS = 150;
@@ -104,6 +106,8 @@ const CRACKS = [
   crack(TOWERS[1] + 8, ARENA.groundY - 54, [[0, 0], [1, 1], [1, 2], [2, 3]]),
   crack(84 + 18, ARENA.groundY - 30, [[0, 0], [-1, 1], [0, 2], [1, 3]]),
 ];
+// Where the goblins that got in dance: on the ground in front of the castle, below the flames.
+const DANCE_SPOTS = [WALL.x + WALL.w / 2]; // one goblin, in front of the gate
 const ROOF_TOP = TOWER_TOP; // highest stone (kept for the text positions)
 // Where goblins stand once they got in, and where the fire burns: the two tower tops and the wall.
 const PERCHES = [
@@ -128,29 +132,6 @@ function logHit(type, t) {
 // Screen position of a dragon cell's centre.
 const cellPos = (d, i) => [DRAGON_BOX.x + ((i % d.cols) + 0.5) * d.cellPx, DRAGON_BOX.y + (Math.floor(i / d.cols) + 0.5) * d.cellPx];
 
-// White silhouette of the dragon, for the hit flash (one per cell count).
-const silhouettes = new Map();
-function dragonSilhouette(d) {
-  if (silhouettes.has(d)) return silhouettes.get(d);
-  const c = document.createElement('canvas');
-  c.width = DRAGON_W;
-  c.height = DRAGON_H;
-  const g = c.getContext('2d');
-  g.fillStyle = '#ffffff';
-  for (let i = 0; i < d.cells; i++) {
-    if (d.shape[i]) g.fillRect((i % d.cols) * d.cellPx, Math.floor(i / d.cols) * d.cellPx, d.cellPx, d.cellPx);
-  }
-  silhouettes.set(d, c);
-  return c;
-}
-
-// Colours of the dragon's art classes per form (the same as boss.css), for the fallen pose.
-const BASE_COLORS = { 1: '#b8324f', 2: '#ffd166', 3: '#7a1f36', 4: '#e8607c', 5: '#2a0a14', 6: '#ffffff', 7: '#5a1a3a', 8: '#f0a070', 9: '#e8dcc0' };
-const FORM_COLORS = {
-  'form-1': BASE_COLORS,
-  'form-2': { ...BASE_COLORS, 1: '#3f8fc9', 3: '#24608f', 4: '#a9e4ff', 7: '#1d4a73', 8: '#d8f3ff' },
-  'form-3': { ...BASE_COLORS, 1: '#6a55a8', 3: '#44337a', 4: '#a796e6', 7: '#3a2a66', 8: '#a99ccf', 2: '#ff5d73' },
-};
 const FALL_MS = 700;
 const ICE_HOLD = 400; // the frozen ice beam is held this long…
 const ICE_SHATTER = 300; // …then it shatters
@@ -170,26 +151,9 @@ const SHIELD = [
   '..kSSk..',
   '...kk...',
 ];
-const PUFF_MS = 480; // a puff of fire travels from the mouth to the shield (several in flight = a dotted stream)
-const FALL_STEPS = 8;
-const fallCache = new Map();
-function fallenCanvas(cls, k, pose) {
-  const key = `${cls}:${k}:${pose}`;
-  if (fallCache.has(key)) return fallCache.get(key);
-  const art = (pose === 'kneel' ? kneelingArt : pose === 'breath' ? breathArt : fallenArt)(k / FALL_STEPS);
-  const colors = FORM_COLORS[cls] || BASE_COLORS;
-  const c = document.createElement('canvas');
-  c.width = art.cols * art.px;
-  c.height = art.rows * art.px;
-  const g = c.getContext('2d');
-  art.shape.forEach((v, i) => {
-    if (!v) return;
-    g.fillStyle = colors[v] || colors[1];
-    g.fillRect((i % art.cols) * art.px, Math.floor(i / art.cols) * art.px, art.px, art.px);
-  });
-  fallCache.set(key, c);
-  return c;
-}
+const PUFF_MS = 480; // an ice shard travels from the mouth to the shield (several in flight = a dotted stream)
+const HURT_MS = 160; // the hurt pose after each hit
+const formIndex = (form) => Math.max(0, FORMS.indexOf(form));
 
 // Every round's trace (for the REPLAY step): raw events + frame times, by round index.
 export const traces = (globalThis.__roundTraces ||= {});
@@ -236,7 +200,7 @@ function freshRound() {
     headLog: [],
     action: null, // { kind: 'dash' | 'goblin' | 'respawn', t0 }
     attempting: false,
-    flashUntil: 0,
+    hurtUntil: 0,
     kbUntil: 0,
     shake: 0,
     shakeAt: 0,
@@ -246,12 +210,26 @@ function freshRound() {
     finishAt: 0,
     finalScheduled: false,
     fallAt: 0, // when the dragon started to fall
-    breath: null, // { t0, ms }: the last long frame (round 1: the ice beam)
-    puffs: [], // { t0 }: real Scheduler slices (rounds 2–3: puffs of fire)
+    breath: null, // { t0, ms }: the last long task (round 1: the ice beam)
+    gaps: [], // long frames waiting for their long-task entry
+    puffs: [], // { t0 }: real Scheduler slices (rounds 2–3: ice shards)
     inputDelays: [],
     result: null,
     resultAt: 0,
   };
+}
+
+// Real long tasks (≥ 50 ms, L1), from the Long Tasks API: { start, ms }, the last few only.
+const longTasks = [];
+let longTasksSupported = false;
+try {
+  new PerformanceObserver((list) => {
+    for (const e of list.getEntries()) longTasks.push({ start: e.startTime, ms: e.duration });
+    if (longTasks.length > 20) longTasks.splice(0, longTasks.length - 20);
+  }).observe({ type: 'longtask' });
+  longTasksSupported = true;
+} catch {
+  longTasksSupported = false;
 }
 
 export function createGame(els) {
@@ -313,7 +291,7 @@ export function createGame(els) {
     if (outcome === 'WIN') {
       g.fallAt = now;
       // The village already fell: the dragon is beaten but only kneels (no victory picture).
-      g.fallPose = g.fallen ? 'kneel' : 'fall';
+      g.fallPose = g.fallen ? 'kneel' : 'defeated';
       if (els.hydra) els.hydra.classList.add('is-collapsed'); // the canvas draws the fallen pose
     }
   }
@@ -517,12 +495,12 @@ export function createGame(els) {
       g.action = { kind: 'respawn', t0: performance.now() };
       play('respawn');
     },
-    // A real Scheduler slice of the list render ended (rounds 2–3): one puff of fire.
+    // A real Scheduler slice of the list render ended (rounds 2–3): one ice shard.
     onSliceEnd(t) {
       if (g.phase !== 'fight' || t < g.startAt) return;
       const now = performance.now();
       const last = g.puffs[g.puffs.length - 1];
-      if (last && now - last.t0 < 20) return; // two slices in the same frame: one visible puff
+      if (last && now - last.t0 < 20) return; // two slices in the same frame: one visible shard
       g.puffs.push({ t0: now });
       if (g.puffs.length > 40) g.puffs.shift();
     },
@@ -540,14 +518,23 @@ export function createGame(els) {
         g.worst = Math.max(g.worst, dt);
         g.frames++;
         g.frameTimes.push(now);
-        // Dragon fire = a real long frame (≥ 50 ms, L1): the heavy render blocked the main thread.
-        // Drawn right after the freeze, with the measured gap. Sliced rounds have no long frames,
-        // so the dragon cannot breathe fire there. Visual only: bites decide the result.
-        if (dt >= RULES.jankMs) {
-          g.breath = { t0: now, ms: Math.round(dt) };
-          g.fkHitAt = now; // he flinches (visual only)
-        }
+        // Dragon ice beam = a real LONG TASK (one task ≥ 50 ms, L1) inside a long frame: the heavy
+        // render blocked the main thread. A frame that is late only because the browser rendered
+        // late between short slices (seen under screen capture) is not a long task: no beam.
+        // Long-task entries arrive a little after the frame, so the gap waits for its task
+        // (up to 500 ms). Without the Long Tasks API, the frame gap alone is used.
+        // Visual only: bites decide the result.
+        if (dt >= RULES.jankMs) g.gaps.push({ from: prev, to: now });
       }
+      for (const gap of g.gaps) {
+        const task = longTasksSupported ? longTasks.find((t) => t.start < gap.to && t.start + t.ms > gap.from) : { ms: gap.to - gap.from };
+        if (task) {
+          g.breath = { t0: now, ms: Math.round(task.ms) };
+          g.fkHitAt = now; // he flinches (visual only)
+          gap.done = true;
+        } else if (now - gap.to > 500) gap.done = true;
+      }
+      if (g.gaps.length) g.gaps = g.gaps.filter((gap) => !gap.done);
 
       // Goblins: resolve the ones whose text was committed before this frame.
       for (const gb of g.goblins) {
@@ -585,10 +572,11 @@ export function createGame(els) {
           headText(`BITE! ${gb.latency} ms late`, '#ff5d73', now);
           play('hit');
         }
-        // After biting, it climbs onto a roof and stays there (one per house), or vanishes.
+        // After biting, it stays and dances on the ground in front of the castle (one at most),
+        // or vanishes.
         if (gb.state === 'bite' && now - gb.t0 >= 360) {
           const onRoofs = g.goblins.filter((x) => x.state === 'roof').length;
-          if (onRoofs < PERCHES.length) {
+          if (onRoofs < DANCE_SPOTS.length) {
             gb.state = 'roof';
             gb.house = onRoofs;
           } else {
@@ -613,7 +601,7 @@ export function createGame(els) {
         imp.done = true;
         logHit(imp.final ? 'dragon-final' : 'dragon', now);
         g.dragonHp = imp.hp;
-        g.flashUntil = now + 50; // about 3 frames, half strength: a flash, not a strobe
+        g.hurtUntil = now + HURT_MS; // the hurt pose
         g.kbUntil = now + 130;
         g.shake = 8;
         g.shakeAt = now;
@@ -665,18 +653,13 @@ export function createGame(els) {
       ctx.textBaseline = 'middle';
       const r = g.phase === 'result' ? g.result : null;
 
-      // The fallen dragon (drawn here once it is down; the DOM grid is hidden then).
+      // The fallen dragon (drawn here once it is down; the DOM grid is hidden then): hurt first,
+      // then kneeling (QUEST FAILED) or lying flat (victory).
       if (g.fallAt) {
-        const k = Math.min(FALL_STEPS, Math.floor(((now - g.fallAt) / FALL_MS) * FALL_STEPS));
+        const pose = now - g.fallAt < FALL_MS / 2 ? 'hurt' : g.fallPose;
         if (r && r.questFailed) ctx.filter = 'grayscale(0.9) brightness(0.8)';
-        ctx.drawImage(fallenCanvas(g.form.cls, k, g.fallPose), DRAGON_BOX.x, DRAGON_BOX.y);
+        ctx.drawImage(poseCanvas(pose, formIndex(g.form)), DRAGON_BOX.x, DRAGON_BOX.y);
         ctx.filter = 'none';
-      }
-      // Hit flash: the dragon's silhouette in white, at the contact frame.
-      if (now < g.flashUntil) {
-        ctx.globalAlpha = 0.5;
-        ctx.drawImage(dragonSilhouette(g.dragon), DRAGON_BOX.x + 12, DRAGON_BOX.y);
-        ctx.globalAlpha = 1;
       }
       // A dragon that was never killed (TIME UP) laughs.
       if (r && !r.dragonDown) {
@@ -687,15 +670,19 @@ export function createGame(els) {
 
       // Breath: while it lasts the canvas draws the dragon with its head down toward Fiber-kun,
       // and the DOM grid is hidden. Round 1: a frozen ICE beam (drawn whole on the first frame
-      // after the long frame). Rounds 2–3: puffs of fire, one per real slice, on the 《Yield》 shield.
+      // after the long frame). Rounds 2–3: ice shards, one per real slice, on the 《Yield》 shield.
       const iceAge = g.breath ? now - g.breath.t0 : Infinity;
       const ice = iceAge < ICE_HOLD + ICE_SHATTER;
       g.puffs = g.puffs.filter((p) => now - p.t0 < PUFF_MS);
       const puffing = g.puffs.length > 0;
       const breathing = !g.fallAt && (ice || puffing);
-      if (els.hydra && !g.fallAt) els.hydra.classList.toggle('is-breathing', breathing);
-      if (breathing) ctx.drawImage(fallenCanvas(g.form.cls, FALL_STEPS, 'breath'), DRAGON_BOX.x, DRAGON_BOX.y);
-      if (!g.fallAt && puffing) drawPuffs(ctx, now);
+      // The ice beam keeps the breath pose (the beam starts at its mouth); otherwise a hit shows the
+      // hurt pose for a moment, and no shards leave the mouth meanwhile.
+      const hurt = !g.fallAt && !ice && now < g.hurtUntil;
+      if (els.hydra && !g.fallAt) els.hydra.classList.toggle('is-breathing', breathing || hurt);
+      if (hurt) ctx.drawImage(poseCanvas('hurt', formIndex(g.form)), DRAGON_BOX.x, DRAGON_BOX.y);
+      else if (breathing) ctx.drawImage(poseCanvas('breath', formIndex(g.form)), DRAGON_BOX.x, DRAGON_BOX.y);
+      if (!g.fallAt && puffing && !hurt) drawPuffs(ctx, now);
       drawVillage(ctx, now);
       drawGoblins(ctx, now);
       drawVillageFire(ctx, now);
@@ -818,6 +805,7 @@ export function createGame(els) {
   function drawVillageFire(ctx, now) {
     if (!g.fallen) return;
     for (let p = 0; p < PERCHES.length; p++) {
+      if (p === 1) continue; // no fire on the wall: the dancing goblin stands in front of it
       const { cx, top } = PERCHES[p];
       for (let k = 0; k < 5; k++) {
         const flick = Math.floor(now / 90 + k * 1.7 + p) % 3;
@@ -829,7 +817,9 @@ export function createGame(els) {
 
   function drawGoblins(ctx, now) {
     let slot = 0;
+    let shown = 0;
     for (const gb of g.goblins) {
+      if (shown >= MAX_GOBLINS_SHOWN) break;
       const frame = GOBLIN[Math.floor(now / 160) % 2];
       let x = GOBLIN_SLOTS[Math.min(slot, GOBLIN_SLOTS.length - 1)];
       let y = ARENA.groundY - GOBLIN_W;
@@ -843,10 +833,9 @@ export function createGame(els) {
         x = GOBLIN_SLOTS[0] + (w.x - GOBLIN_W / 2 - GOBLIN_SLOTS[0]) * p;
       }
       if (gb.state === 'roof') {
-        // Dancing on the battlements.
-        const p = PERCHES[gb.house];
-        x = p.cx - GOBLIN_W / 2;
-        y = p.top + PX - GOBLIN_W - Math.abs(Math.sin(now / 140 + gb.house)) * 14;
+        // Dancing on the ground in front of the castle (never on the flames).
+        x = DANCE_SPOTS[gb.house] - GOBLIN_W / 2;
+        y = ARENA.groundY - GOBLIN_W - Math.abs(Math.sin(now / 140 + gb.house)) * 14;
       }
       if (gb.state === 'dying') {
         const t = now - gb.t0;
@@ -856,6 +845,7 @@ export function createGame(els) {
         if (!gb.quiet) x = GOBLIN_SLOTS[0] + Math.max(0, t - 70) * 0.25; // small knockback (to the right)
       }
       if (alpha <= 0) continue;
+      shown++;
       const img = spriteCanvas(frame, palette, GOBLIN_SCALE);
       ctx.globalAlpha = Math.max(0, alpha);
       ctx.drawImage(img, Math.round(x), Math.round(y));
@@ -889,7 +879,7 @@ export function createGame(els) {
     const a = g.action;
     const t = a ? now - a.t0 : Infinity;
     const facingLeft = false; // goblins and the dragon are both on his right
-    const singed = now - g.fkHitAt < 300 && !result; // flinch while the dragon's fire hits him
+    const singed = now - g.fkHitAt < 300 && !result; // flinch while the dragon's ice hits him
     const frame = g.fkY > 0 ? FIBER_KUN.walk[0] : singed ? FACES.shocked : result && result.rank === 'S' ? FACES.smug : FIBER_KUN.idle[Math.floor(now / 300) % 2];
     const img = spriteCanvas(frame, PALETTE, HERO.scale);
     const hb = bbox(FIBER_KUN.idle[0]);
@@ -957,13 +947,14 @@ export function createGame(els) {
   }
 
   // ---------- the dragon's breath ----------
-  // The mouth when the head is down (art column 3, row 17 + the drop), and Fiber-kun's face.
+  // From the breath pose's mouth (the pack's anchor) to Fiber-kun's body, wherever he is.
   function breathLine(now) {
-    const mx = DRAGON_BOX.x + 3 * PX + PX / 2;
-    const my = DRAGON_BOX.y + (17 + BREATH_DROP(3, 1)) * PX + PX / 2;
-    // aimed at his home spot (a dash is short; the breath does not follow him into the dragon)
-    const tx = HERO.homeX + HERO.size * 0.5;
-    const ty = ARENA.groundY - HERO.size * 0.55;
+    const mx = DRAGON_BOX.x + (DRAGON_POINTS.mouth[0] + 0.5) * ART_PX;
+    const my = DRAGON_BOX.y + (DRAGON_POINTS.mouth[1] + 0.5) * ART_PX;
+    // Aimed at his body and it stops at his front edge: it never passes over his head toward the
+    // castle. It follows him if he is dashing.
+    const tx = heroX(now) + HERO.size - 3 * PX;
+    const ty = ARENA.groundY - HERO.size * 0.45;
     const len = Math.hypot(tx - mx, ty - my);
     return { mx, my, tx, ty, len, ux: (tx - mx) / len, uy: (ty - my) / len };
   }
@@ -973,9 +964,9 @@ export function createGame(els) {
   // the end), frost on him, the measured time. Held 400 ms, then it shatters.
   function drawIce(ctx, now, b, age) {
     const L = breathLine(now);
-    const half = (d) => PX + (d / L.len) * (HERO.size * 0.55); // half-width, ≥ his height at the end
+    const half = (d) => PX + (d / L.len) * (HERO.size * 0.3); // half-width: about his body at the end
     const cells = [];
-    const minX = Math.min(L.mx, L.tx) - HERO.size;
+    const minX = Math.min(L.mx, L.tx) - PX;
     const maxX = Math.max(L.mx, L.tx) + PX;
     const minY = Math.min(L.my, L.ty) - HERO.size;
     const maxY = Math.max(L.my, L.ty) + HERO.size;
@@ -1010,7 +1001,7 @@ export function createGame(els) {
     ctx.globalAlpha = 1;
     if (!shatter) {
       // frost on Fiber-kun
-      const hx = HERO.homeX;
+      const hx = heroX(now);
       const hy = ARENA.groundY - HERO.size;
       ctx.fillStyle = 'rgba(174, 240, 255, 0.45)';
       ctx.fillRect(hx + PX, hy + 3 * PX, HERO.size - 2 * PX, HERO.size - 4 * PX);
@@ -1018,14 +1009,15 @@ export function createGame(els) {
       for (const [ox, oy] of [[2, 4], [12, 5], [4, 13], [13, 12], [8, 3]]) ctx.fillRect(hx + ox * PX, hy + oy * PX, PX, PX);
       ctx.font = '40px DotGothic16';
       ctx.fillStyle = '#05071a';
-      ctx.fillText(`${b.ms} ms frozen`, (L.mx + L.tx) / 2 + 3, Math.min(L.my, L.ty) - 120 + 3);
+      // the label sits above the start of the beam, clear of the BITE lines on the left
+      ctx.fillText(`${b.ms} ms frozen`, L.mx - 160 + 3, L.my - 90 + 3);
       ctx.fillStyle = '#aef0ff';
-      ctx.fillText(`${b.ms} ms frozen`, (L.mx + L.tx) / 2, Math.min(L.my, L.ty) - 120);
+      ctx.fillText(`${b.ms} ms frozen`, L.mx - 160, L.my - 90);
     }
   }
 
-  // Rounds 2–3: one puff of fire per real slice, from the mouth to the 《Yield》 shield in front of
-  // Fiber-kun. The gaps between puffs are the yields.
+  // Rounds 2–3: the same ice breath, broken into small shards: one shard per real slice, from the
+  // mouth to the 《Yield》 shield in front of Fiber-kun. The gaps between shards are the yields.
   function drawPuffs(ctx, now) {
     const L = breathLine(now);
     const shieldX = HERO.homeX + HERO.size + PX;
@@ -1035,13 +1027,12 @@ export function createGame(els) {
       const d = u * stop;
       const cx = L.mx + L.ux * d;
       const cy = L.my + L.uy * d;
-      const r = 1; // small puffs: several in flight read as a dotted stream (gaps = yields)
+      const r = 1; // small shards: several in flight read as a dotted stream (gaps = yields)
       for (let i = -r; i <= r; i++) {
         for (let j = -r; j <= r; j++) {
           if (i * i + j * j > r * r + 1) continue;
-          const flick = Math.floor(now / 60 + i + j) % 3;
           ctx.globalAlpha = 1 - u * 0.4;
-          ctx.fillStyle = i === 0 && j === 0 ? '#fff3b0' : flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
+          ctx.fillStyle = i === 0 && j === 0 ? '#ffffff' : (i + j) % 2 ? '#5fc9e8' : '#aef0ff';
           ctx.fillRect(Math.round((cx + i * PX) / PX) * PX, Math.round((cy + j * PX) / PX) * PX, PX, PX);
         }
       }

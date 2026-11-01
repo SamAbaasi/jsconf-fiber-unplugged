@@ -91,11 +91,20 @@ async function measureScale(page) {
         const arena = document.querySelector('.boss-arena');
         const grid = document.querySelector('.dragon-grid');
         // Arena H = the arena box (760 px on the 1920×1080 stage); the stage may be scaled.
-        const k = arena ? arena.getBoundingClientRect().width / 1150 : 1;
+        const k = arena ? arena.getBoundingClientRect().width / 1330 : 1;
         return {
           boxes,
           arenaH: arena ? arena.getBoundingClientRect().height / k : null,
-          dragonH: grid ? grid.getBoundingClientRect().height / k : null,
+          // the painted cells only (the grid box also holds empty rows)
+          dragonH: grid
+            ? (() => {
+                const painted = grid.querySelectorAll('i:not(.e)');
+                if (!painted.length) return null;
+                const top = painted[0].getBoundingClientRect().top;
+                const bottom = painted[painted.length - 1].getBoundingClientRect().bottom;
+                return (bottom - top) / k;
+              })()
+            : null,
         };
       });
 }

@@ -11,7 +11,7 @@ import { FIBER_KUN, DEV, BAG, COFFEE, PALETTE } from '../src/sprites/fiberkun.js
 import { GOBLIN, GOBLIN_PALETTE } from '../src/sprites/goblin.js';
 import { TRUCK, TRUCK_PALETTE } from '../src/sprites/truck.js';
 import { TORII, TORII_PALETTE } from '../src/sprites/torii.js';
-import { makeDragon, SHAPE_ROWS_USED } from '../src/demo/dragon.js';
+import { makeDragon, DRAGON_COLORS, ART_PX } from '../src/demo/dragon.js';
 
 const rows = scaleReport();
 const w = Math.max(...rows.map((r) => r.name.length));
@@ -27,8 +27,8 @@ if (process.argv.includes('--lineup')) {
   const out = path.join(root, '.check');
   mkdirSync(out, { recursive: true });
   const { chromium } = createRequire(import.meta.url)('playwright');
-  const d = makeDragon(10000);
-  const dragonCell = SCALES.boss.dragonH / SHAPE_ROWS_USED;
+  const d = makeDragon(3036); // one cell per art pixel (the deck's grid uses 2 × 2 cells per pixel)
+  const dragonCell = ART_PX;
   const items = [
     { group: 'world', label: 'previous life ×8', frame: DEV[0], pal: PALETTE, scale: SCALES.world },
     { group: 'world', label: 'reborn ×8', frame: FIBER_KUN.idle[0], pal: PALETTE, scale: SCALES.world },
@@ -41,7 +41,7 @@ if (process.argv.includes('--lineup')) {
   const props = { laptop: BAG, coffee: COFFEE, pal: PALETTE };
   const html = `<!doctype html><html><body style="margin:0;background:#0b0c2e"><canvas id=c width=3500 height=1000></canvas><script>
   const items = ${JSON.stringify(items)}; const props = ${JSON.stringify(props)}; const H = ${SCALES.boss.arenaH};
-  const DRAGON_COLORS = ['', '#6b5bd1','#ffd166','#3b2f8f','#9a8cf0','#120c2c','#ffffff','#4a3f9a','#c9c3e8','#ffd166'];
+  const DRAGON_COLORS = ${JSON.stringify(DRAGON_COLORS)};
   const g = document.getElementById('c').getContext('2d');
   const base = 880;
   g.font = '22px monospace'; g.fillStyle = '#ffffff';
@@ -58,7 +58,7 @@ if (process.argv.includes('--lineup')) {
     let w, h;
     if (it.dragon) {
       const { cols, rows, shape } = it.dragon; const s = it.scale;
-      for (let i = 0; i < shape.length; i++) { if (!shape[i]) continue; g.fillStyle = DRAGON_COLORS[shape[i]]; g.fillRect(x + (i % cols) * s, base - (rows - Math.floor(i / cols)) * s, Math.ceil(s), Math.ceil(s)); }
+      for (let i = 0; i < shape.length; i++) { if (shape[i] < 0) continue; g.fillStyle = DRAGON_COLORS[shape[i]]; g.fillRect(x + (i % cols) * s, base - (rows - Math.floor(i / cols)) * s, Math.ceil(s), Math.ceil(s)); }
       w = cols * s; h = rows * s;
     } else {
       draw(it.frame, it.pal, it.scale, x, it.box); w = it.box.w * it.scale; h = it.box.h * it.scale;

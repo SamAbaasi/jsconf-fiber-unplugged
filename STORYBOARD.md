@@ -25,7 +25,7 @@ Each one shows its real name on screen at least once.
 | 3 | **《Yield》**, the "dud skill" = stop after 5 ms, give the browser a turn, continue from the same fiber | "《Yield》 = shouldYield()" | A2, B1, C4, C5 |
 | 4 | **Guild quest board** = the lanes. 31 slots; **emergency quest** = SyncLane (never posted on the board); **expedition** = a Transition (can pause) | "Quest board = lanes (31-bit mask)" | D1, D2, C2, A4 |
 | 5 | **RESPAWN AT ROOT** = an interrupt: the half-built tree is thrown away | "Respawn = interrupt · prepareFreshStack" | B2, B3, B6 |
-| 6 | **The boss room**: **Goblin** = one keystroke; **Dragon** = the heavy list render | "Goblin = keystroke · SyncLane" / "Dragon = 10,000-fiber render · Transition" | D2, C2, A4, E4, F1 |
+| 6 | **The boss room**: **Goblin** = one keystroke; **Dragon** = the heavy list render | "Goblin = keystroke · SyncLane" / "Dragon = 12,144-fiber render · Transition" | D2, C2, A4, E4, F1 |
 
 Genre words that are **not** extra metaphors (they are framing): LEVEL UP, skill card, [SYSTEM] window, E–S ranks, 図鑑 bestiary, 仲間募集.
 

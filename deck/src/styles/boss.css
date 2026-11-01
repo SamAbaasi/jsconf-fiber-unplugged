@@ -8,12 +8,12 @@
 .boss-mode.is-on.rank-S { color: #1b1300; background: var(--rank-s); border-color: var(--rank-s); }
 .boss-mode.is-on.rank-D { color: #00140c; background: var(--rank-d); border-color: var(--rank-d); }
 
-/* Arena: world (canvas) → Hydra (10,000 DOM cells) → effects (canvas) → HUD */
+/* Arena: world (canvas) → dragon (12,144 DOM cells) → effects (canvas) → HUD */
 .boss-arena {
   position: absolute;
   left: 30px;
   top: 110px;
-  width: 1150px;
+  width: 1330px;
   height: 760px;
   overflow: hidden;
   border: 5px solid var(--win-line);
@@ -21,7 +21,7 @@
   box-shadow: 0 0 0 5px var(--win-edge);
   will-change: transform;
 }
-.boss-layer { position: absolute; left: 0; top: 0; width: 1150px; height: 760px; }
+.boss-layer { position: absolute; left: 0; top: 0; width: 1330px; height: 760px; }
 .boss-fx { pointer-events: none; }
 
 .boss-hydra { position: absolute; transform-origin: 50% 100%; transition: transform 1.2s ease-in, opacity 1.2s ease-in; }
@@ -44,28 +44,7 @@
 }
 .is-pending .dragon-grid { opacity: 0.6; }
 .dragon-grid i { display: block; }
-.dragon-grid .c0 { background: transparent; }
-.dragon-grid .c1 { background: #b8324f; }
-.dragon-grid .c2 { background: #ffd166; }
-.dragon-grid .c3 { background: #7a1f36; }
-.dragon-grid .c4 { background: #e8607c; }
-.dragon-grid .c5 { background: #2a0a14; }
-.dragon-grid .c6 { background: #ffffff; }
-.dragon-grid .c7 { background: #5a1a3a; }
-.dragon-grid .c8 { background: #f0a070; }
-.dragon-grid .c9 { background: #e8dcc0; }
 /* Same cells, same work; only the colors change per form. */
-.form-2 .dragon-grid .c1 { background: #3f8fc9; }
-.form-2 .dragon-grid .c3 { background: #24608f; }
-.form-2 .dragon-grid .c4 { background: #a9e4ff; }
-.form-2 .dragon-grid .c7 { background: #1d4a73; }
-.form-2 .dragon-grid .c8 { background: #d8f3ff; }
-.form-3 .dragon-grid .c1 { background: #6a55a8; }
-.form-3 .dragon-grid .c3 { background: #44337a; }
-.form-3 .dragon-grid .c4 { background: #a796e6; }
-.form-3 .dragon-grid .c7 { background: #3a2a66; }
-.form-3 .dragon-grid .c8 { background: #a99ccf; }
-.form-3 .dragon-grid .c2 { background: #ff5d73; }
 
 .boss-timer { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); padding: 0 16px; font-size: 44px; color: #fff; background: rgba(5, 7, 26, 0.7); border-radius: 8px; }
 
@@ -82,7 +61,7 @@
 .hud-respawn { color: #9af5ea; }
 .hud-sub { color: var(--dim); }
 
-.boss-overlay { position: absolute; left: 1205px; top: 84px; width: 685px; height: 966px; z-index: 5; display: none; }
+.boss-overlay { position: absolute; left: 1385px; top: 84px; width: 505px; height: 966px; z-index: 5; display: none; }
 .boss-overlay.is-ready,
 .boss-overlay.is-result {
   display: block;
@@ -118,7 +97,7 @@
 .bo-line { margin-top: 18px; font-size: 36px; color: var(--rank-s); }
 .bo-rule { margin-top: 18px; font-size: 28px; color: var(--muted); }
 
-.boss-input { position: absolute; left: 30px; top: 896px; width: 1150px; height: 150px; display: flex; align-items: center; gap: 22px; padding: 20px 28px; }
+.boss-input { position: absolute; left: 30px; top: 896px; width: 1330px; height: 150px; display: flex; align-items: center; gap: 22px; padding: 20px 28px; }
 .boss-input-label { font-size: 40px; color: var(--rank-s); white-space: nowrap; }
 .boss-input-field { flex: 1; min-width: 0; font: 56px var(--font-code); color: var(--ink); background: #070b26; border: 4px solid var(--muted); border-radius: 8px; padding: 2px 16px; outline: none; }
 .boss-input-field:focus { border-color: var(--rank-s); }
@@ -129,11 +108,11 @@
 .boss-code-line { margin-left: 24px; font-family: var(--font-code); font-size: 34px; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; color: #dfe4ff; white-space: nowrap; }
 .boss-code-line .c { color: #8a90b5; }
 /* Two big numbers, readable from the back row. */
-.boss-big { left: 1205px; width: 685px; padding: 10px 24px; text-align: center; }
+.boss-big { left: 1385px; width: 505px; padding: 10px 24px; text-align: center; }
 .boss-big-fps { top: 110px; height: 450px; padding-top: 60px; }
 .boss-big-key { top: 590px; height: 460px; padding-top: 60px; }
 .boss-big-label { font-size: 56px; color: var(--muted); }
-.boss-big-num { font-size: 180px; line-height: 1.1; color: #fff; }
+.boss-big-num { font-size: 130px; line-height: 1.1; color: #fff; }
 .boss-fps-num { color: var(--rank-d); }
 .boss-fps-num[data-level='warn'] { color: var(--rank-s); }
 .boss-fps-num[data-level='bad'] { color: var(--rank-a); }
@@ -150,9 +129,9 @@
 .boss-calib.is-on {
   display: block;
   position: absolute;
-  left: 1205px;
+  left: 1385px;
   top: 110px;
-  width: 685px;
+  width: 505px;
   height: 940px;
   z-index: 8;
   padding: 24px 30px;
@@ -188,19 +167,4 @@
 .bo-key b.good { color: var(--rank-d); }
 .bo-mode { display: block; font-size: 44px; color: var(--muted); }
 
-/* Search hits: the same colours, a little lighter (cells keep the ×12 art). */
-.dragon-grid .h.c1 { background: #cf4d69; }
-.dragon-grid .h.c3 { background: #933049; }
-.dragon-grid .h.c4 { background: #f07d95; }
-.dragon-grid .h.c7 { background: #6e2a4c; }
-.dragon-grid .h.c8 { background: #f5b48b; }
-.form-2 .dragon-grid .h.c1 { background: #5aa3d6; }
-.form-2 .dragon-grid .h.c3 { background: #3a77a6; }
-.form-2 .dragon-grid .h.c4 { background: #c0ecff; }
-.form-2 .dragon-grid .h.c7 { background: #2d5f8c; }
-.form-2 .dragon-grid .h.c8 { background: #e6f7ff; }
-.form-3 .dragon-grid .h.c1 { background: #7c68ba; }
-.form-3 .dragon-grid .h.c3 { background: #56458c; }
-.form-3 .dragon-grid .h.c4 { background: #b7a8ef; }
-.form-3 .dragon-grid .h.c7 { background: #4b3a7a; }
-.form-3 .dragon-grid .h.c8 { background: #bdb2e0; }
+/* Dragon colours (and lighter search hits) come from the pack: dragonCss() in demo/dragon.js. */

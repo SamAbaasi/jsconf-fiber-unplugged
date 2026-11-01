@@ -1,0 +1,42 @@
+{
+ "grid": [
+  66,
+  46
+ ],
+ "scale": 12,
+ "poses": {
+  "idle": {
+   "mouth": null,
+   "baseline_row": 39
+  },
+  "anticipation": {
+   "mouth": [
+    6,
+    11
+   ],
+   "baseline_row": 39
+  },
+  "breath": {
+   "mouth": [
+    4,
+    20
+   ],
+   "baseline_row": 39
+  },
+  "hurt": {
+   "mouth": [
+    7,
+    12
+   ],
+   "baseline_row": 39
+  },
+  "kneel": {
+   "mouth": null,
+   "baseline_row": 40
+  },
+  "defeated": {
+   "mouth": null,
+   "baseline_row": 39
+  }
+ }
+}

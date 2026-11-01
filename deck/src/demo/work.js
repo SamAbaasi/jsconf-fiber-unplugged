@@ -6,7 +6,7 @@ let itersPerMicro = 50;
 let itersPerCell = 0;
 let sink = 0;
 
-export const settings = { microsPerCell: 12 };
+export const settings = { microsPerCell: 17 }; // 12,144 cells × 17 µs: round 1 worst key > 200 ms on the dev laptop
 
 function spin(iters) {
   let x = sink | 1;

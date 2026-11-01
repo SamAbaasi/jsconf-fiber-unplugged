@@ -17,7 +17,7 @@ export const SCALES = {
     arenaH: 760, // boss arena height H, px
     hero: 12, // Fiber-kun in the arena
     goblin: 12, // 8×8 goblin on the same ×12 grid as Fiber-kun
-    dragonH: 480, // the dragon's drawn height, px: 80 rows × 6 px, so 10,000 cells are whole pixels
+    dragonH: SHAPE_ROWS_USED * 12, // the pack dragon's drawn height: 41 used rows on the same ×12 grid = 492 px
   },
 };
 
