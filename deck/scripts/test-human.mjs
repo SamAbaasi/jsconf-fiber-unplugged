@@ -24,6 +24,7 @@ const arg = (name, def) => (args.includes(name) ? args[args.indexOf(name) + 1] :
 const runs = Number(arg('--runs', 20));
 const throttle = Number(arg('--throttle', 1));
 const modes = arg('--modes', 'mixed,slow,early,repro').split(',');
+const rounds = arg('--rounds', '1,2,3').split(',').map(Number);
 const html = arg('--html', path.join(root, 'dist', 'index.html'));
 const outDir = path.join(root, '.check');
 mkdirSync(outDir, { recursive: true });
@@ -94,6 +95,7 @@ await page.waitForTimeout(1500);
 
 const rows = [];
 for (let round = 0; round < 3; round++) {
+  if (!rounds.includes(round + 1)) continue;
   await page.goto(`${url}#/${BOSS}/${round * 2}`);
   await page.waitForTimeout(1200);
   for (const mode of modes) {
@@ -121,7 +123,7 @@ for (let round = 0; round < 3; round++) {
         r = { outcome: 'NO RESULT' };
       }
       const keys = steps.filter((s) => s.key !== 'Enter' && !s.key.startsWith('__')).length;
-      const row = { round: round + 1, mode: realMode, pauseEndedRound, run, typed: keys, keys: r.keys, rank: r.rank, questFailed: r.questFailed, bites: r.bites, biteRatio: r.biteRatio, worstKeyMs: r.worstLatencyMs, outcome: r.outcome, durationMs: r.durationMs };
+      const row = { round: round + 1, mode: realMode, pauseEndedRound, run, typed: keys, keys: r.keys, rank: r.rank, questFailed: r.questFailed, bites: r.bites, biteRatio: r.biteRatio, worstKeyMs: r.worstLatencyMs, outcome: r.outcome, durationMs: r.durationMs, worstFrameMs: r.worstFrameMs, worstPhase: r.phases?.worst ?? null };
       const ok = !pauseEndedRound && (round === 0 ? r.questFailed === true : r.rank === 'S' || r.rank === 'A');
       row.ok = ok;
       rows.push(row);
