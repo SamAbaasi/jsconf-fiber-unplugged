@@ -254,3 +254,44 @@ The a/b/c2/c4 rows are from the final boss code (confirmation run). The d rows a
     - In slow rounds the worst frame is long (median 85 ms, max 170 ms), but its split is mostly "other": 54 of 74 ms in the A case, against render 7 and commit 5.
     - So it is not React's render or commit. It is probably garbage collection or browser work in a long, mostly idle round on a throttled CPU.
     - A key that lands in such a frame is late. This happens only in the 15 s slow mode at 2×; never at normal speed.
+
+## Small fixes: focus, replay labels, FAILED, INP colour (2026-11-01)
+Art, story, text, slide order and timings unchanged.
+1. **Focus:**
+   - The search box blurs when a round or replay step opens and when a round ends. Esc always blurs it.
+   - A before the first key starts auto-type even with the box focused, and never types "a".
+   - A after a round, or right after the 12th key, waits for the result, then starts a new round and auto-types it.
+   - So a round that starts with the letter "a" by hand is not possible (RUNBOOK).
+2. **Replay labels:** a long-frame label is drawn only if it fits inside its bar and keeps 12 px from the previous label.
+3. **Worst key's frame:** outlined and labelled "frame N ms · key M ms".
+4. **Red frame in an S round of replay 2:**
+   - It came 11–16 ms after the round's first key, in 4 of 10 talk-order runs (52–61 ms).
+   - LoAF split: our rAF drawing (up to 46 ms) plus style/layout/paint, while it built the frost poses, the shield and the 《Yield》 text for the first time.
+   - The fix pre-draws those when the slide opens: 0 of 10 runs after the fix.
+   - Still possible: a rare frame where several 5 ms slices ran back to back before a paint (LoAF: no task ≥ 50 ms, blocking 0). This was 1 of 10 runs with the final build (65 ms, at 885 ms).
+   - A speaker-notes line explains both.
+5. **Outcome:** a failed round's `data-result.outcome` is "FAILED"; `dragonDown` still says whether the dragon fell.
+6. **INP colour and calibration:**
+   - A failed round never shows a green INP label: "INP: good" stays as text but turns grey.
+   - Calibration aims round 1's median worst key at 230–320 ms (target 275, at most 8 settings).
+   - Default work is 18 µs per cell; 19 µs gave 300–328 ms here.
+
+**Test** (`scripts/test-fixes.mjs`, final build 65367fc, Chromium, 5 runs each):
+- auto = A pressed with the box focused
+- human = 12 keys, 180 ms apart
+- A-after = A right after the 12th key, box still focused
+
+| round | auto | human | A-after (and the round A starts) | worst key, min–max (median) |
+|---|---|---|---|---|
+| 1 | QUEST FAILED 5/5 | QUEST FAILED 5/5 | QUEST FAILED 5/5 (QUEST FAILED 5/5) | auto 216–261 (231) · human 228–254 (236) · A-after 226–250 (234) |
+| 2 | S 5/5 | S 5/5 | S 5/5 (S 5/5) | 18–34 |
+| 3 | S 5/5 | S 5/5 | S 5/5 (S 5/5) | 19–38 |
+
+- Every check passed (45/45). Failed rounds with outcome "FAILED": 15/15.
+- Zero cases of: green INP on a failed round, "a" typed by A, a 13th key, or focus left on the box after a round.
+- **Round 1 band:**
+  - Round 1's median worst key is inside 230–320 in every mode.
+  - **3 of 15 single runs were below 230** (216, 226, 228), none ≤ 200.
+  - The same machine gave 300–328 ms at 19 µs in the session before. Between sessions it varies by about ±15%, so the band is for the median, set by calibration on the stage laptop.
+- **Round 2 in talk order (round 1 → replay → round 2, 10 runs):** S 10/10. One run had one 65 ms frame (no long task), the rest ≤ 45 ms.
+- **check:** claims, scale and offline (52 states, no network, no errors) all OK.
