@@ -106,6 +106,8 @@ export function BossFight({ step }) {
     const els = Object.fromEntries(names.map((n) => [n, refs[n].current]));
     els.resultLine = (r) => resultLine(r, modeRef.current.key);
     els.onTrace = () => setTraceVersion((v) => v + 1);
+    // A round ended: the search box lets go of the keyboard, so A / R / the clicker work again.
+    els.onEnd = () => inputRef.current?.blur();
     const game = createGame(els);
     gameRef.current = game;
     const stop = startMonitor(els, game);
@@ -145,6 +147,11 @@ export function BossFight({ step }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  // A round or replay step opens: the search box lets go of the keyboard (otherwise A types "a").
+  useEffect(() => {
+    inputRef.current?.blur();
+  }, [step, modeOverride]);
+
   // The clicker (next) during a fight ends the round early instead of changing the slide.
   useEffect(() => {
     if (replay) return undefined;
@@ -172,7 +179,27 @@ export function BossFight({ step }) {
     clearInterval(typingTimer.current);
     typingTimer.current = 0;
   };
+  // A after a finished round: a new round, then auto-type (after the warm-up). While the round is
+  // still finishing, wait for its result first (the result is never thrown away).
+  const autoTypeWait = useRef(0);
   const autoType = () => {
+    clearInterval(autoTypeWait.current);
+    const game = gameRef.current;
+    const phase = game?.state.phase;
+    if (phase === 'finishing' || phase === 'result' || game?.roundFull()) {
+      const t0 = performance.now();
+      autoTypeWait.current = setInterval(() => {
+        const ph = gameRef.current?.state.phase;
+        if ((ph === 'finishing' || ph === 'fight') && performance.now() - t0 < 30000) return;
+        clearInterval(autoTypeWait.current);
+        newRound();
+        autoTypeWait.current = setTimeout(startAutoType, 600);
+      }, 50);
+      return;
+    }
+    startAutoType();
+  };
+  const startAutoType = () => {
     stopTyping();
     const input = inputRef.current;
     let i = 0;
@@ -237,8 +264,14 @@ export function BossFight({ step }) {
   };
   useEffect(() => {
     const onKey = (e) => {
-      if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
       const h = handlers.current;
+      // Escape always lets go of the search box (and cancels a calibration).
+      if (e.key === 'Escape') {
+        inputRef.current?.blur();
+        h.cancelCalibration();
+        return;
+      }
+      if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'a' || e.key === 'A') h.autoType();
       else if (e.key === 'c' || e.key === 'C') h.clear();
       else if (e.key === 'r' || e.key === 'R') h.newRound();
@@ -247,7 +280,6 @@ export function BossFight({ step }) {
       else if (e.key === '[') h.changeWork(-2);
       else if (e.key === 'i' || e.key === 'I') inputRef.current?.focus();
       else if (e.key === 'k' || e.key === 'K') h.calibrationKey();
-      else if (e.key === 'Escape') h.cancelCalibration();
     };
     // ↑ = jump. Handled on window in the capture phase, before the deck sees it, so it never
     // changes the slide and the input keeps its focus. Input delay = handling time − event time.
@@ -265,6 +297,8 @@ export function BossFight({ step }) {
       window.removeEventListener('keydown', onJump, { capture: true });
       window.removeEventListener('keydown', onKey);
       clearInterval(typingTimer.current);
+      clearInterval(autoTypeWait.current);
+      clearTimeout(autoTypeWait.current);
       calibRef.current?.cancel?.();
     };
   }, []);
@@ -331,6 +365,15 @@ export function BossFight({ step }) {
             if (e.key === 'Enter') {
               e.preventDefault();
               gameRef.current?.endEarly();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              e.currentTarget.blur();
+            } else if ((e.key === 'a' || e.key === 'A') && !e.ctrlKey && !e.metaKey && !e.altKey && (gameRef.current?.state.phase !== 'fight' || gameRef.current?.roundFull())) {
+              // Before the first key, or once all of the round's keys are in: A means auto-type
+              // (a new round after this one's result), never the letter "a".
+              e.preventDefault();
+              e.currentTarget.blur();
+              handlers.current.autoType();
             }
           }}
           autoComplete="off"

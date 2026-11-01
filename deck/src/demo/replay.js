@@ -47,14 +47,19 @@ function analyse(trace) {
   for (const k of keys) {
     if (!k.commitT) continue;
     const f = frames.find((t) => t > k.commitT);
-    if (f) k.latency = f - k.ts;
+    if (f) {
+      k.latency = f - k.ts;
+      k.frameT = f; // the frame that first showed this key
+    }
   }
   const gaps = [];
   for (let i = 1; i < frames.length; i++) gaps.push([frames[i - 1], frames[i]]);
   return { keys, sync, slices, thrown, gaps };
 }
 
-function lanes(g, a, t0, t1, top, scale) {
+// worstKey: the worst keystroke (its frame gets the label "frame N ms · key M ms", so the frame's
+// length and the key's latency are never confused).
+function lanes(g, a, t0, t1, top, scale, worstKey) {
   const x = (t) => LABEL_W + ((t - t0) / (t1 - t0)) * PLOT;
   const clip = ([s, e]) => [Math.max(s, t0), Math.min(e, t1)];
   const rows = { keys: top, react: top + 70, frames: top + 160 };
@@ -89,19 +94,35 @@ function lanes(g, a, t0, t1, top, scale) {
     g.setLineDash([]);
   }
   // frames
+  // Labels under long frames: a label is drawn only when it fits inside its own bar (with a
+  // margin) and does not touch the previous label. Otherwise it is left out: never overlapping.
+  g.font = '32px DotGothic16';
+  let lastRight = -Infinity;
   for (const [s, e] of a.gaps) {
     if (e < t0 || s > t1) continue;
     const long = e - s > JANK;
     g.fillStyle = long ? '#ff5d73' : '#3b8f6a';
-    if (long) g.fillRect(x(Math.max(s, t0)), rows.frames, Math.max(3, x(Math.min(e, t1)) - x(Math.max(s, t0)) - 2), 48);
+    const bx0 = x(Math.max(s, t0));
+    const bx1 = x(Math.min(e, t1));
+    if (long) g.fillRect(bx0, rows.frames, Math.max(3, bx1 - bx0 - 2), 48);
     else g.fillRect(x(e) - 1, rows.frames + 8, scale > 1 ? 3 : 1, 32);
-    if (long && e - s >= 100 && x(e) - x(s) > 80) {
-      g.fillStyle = '#ffffff';
-      g.font = '32px DotGothic16';
-      g.textAlign = 'center';
-      g.fillText(`${Math.round(e - s)} ms`, (x(Math.max(s, t0)) + x(Math.min(e, t1))) / 2, rows.frames + 76);
-      g.textAlign = 'left';
+    if (!long) continue;
+    const isWorstKeyFrame = worstKey && worstKey.frameT === e;
+    const text = isWorstKeyFrame ? `frame ${Math.round(e - s)} ms · key ${Math.round(worstKey.latency)} ms` : `${Math.round(e - s)} ms`;
+    const tw = g.measureText(text).width;
+    const cx = (bx0 + bx1) / 2;
+    const left = cx - tw / 2;
+    if (tw + 12 > bx1 - bx0 || left < lastRight + 12) continue;
+    if (isWorstKeyFrame) {
+      g.strokeStyle = '#ffffff';
+      g.lineWidth = 3;
+      g.strokeRect(bx0 - 3, rows.frames - 3, Math.max(3, bx1 - bx0 - 2) + 6, 54);
     }
+    g.fillStyle = '#ffffff';
+    g.textAlign = 'center';
+    g.fillText(text, cx, rows.frames + 76);
+    g.textAlign = 'left';
+    lastRight = cx + tw / 2;
   }
   // keys
   for (const k of a.keys) {
@@ -140,9 +161,10 @@ export function drawReplay(canvas, trace, takeaway) {
   g.textAlign = 'left';
   g.textBaseline = 'alphabetic';
   g.fillText(`whole round · ${((t1 - t0) / 1000).toFixed(1)} s`, LABEL_W, 40);
-  lanes(g, a, t0, t1, 64, 1);
-  // zoom: 300 ms around the worst key
+  // worst key first (the zoom and the frame labels use it)
   const worst = a.keys.filter((k) => k.latency).reduce((m, k) => (!m || k.latency > m.latency ? k : m), null);
+  lanes(g, a, t0, t1, 64, 1, worst);
+  // zoom: 300 ms around the worst key
   const center = worst ? worst.t + Math.min(150, worst.latency / 2) : (t0 + t1) / 2;
   const z0 = center - 150;
   const z1 = center + 150;
@@ -157,7 +179,7 @@ export function drawReplay(canvas, trace, takeaway) {
   g.lineWidth = 3;
   g.strokeRect(xw(z0), 56, Math.max(6, xw(z1) - xw(z0)), 300);
   g.strokeRect(LABEL_W - 4, 420, PLOT + 8, 300);
-  lanes(g, a, z0, z1, 436, 2);
+  lanes(g, a, z0, z1, 436, 2, worst);
   // legend + takeaway
   g.textBaseline = 'middle';
   g.font = '36px DotGothic16';

@@ -176,3 +176,4 @@
 .bo-mode { display: block; font-size: 34px; color: var(--muted); }
 
 /* Dragon colours (and lighter search hits) come from the pack: dragonCss() in demo/dragon.js. */
+.bo-key i.inp-neutral { color: var(--muted); }

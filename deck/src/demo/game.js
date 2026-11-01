@@ -38,8 +38,10 @@ export const RULES = {
 
 // INP label for the worst key (CLAIMS L5): ≤ 200 ms good, ≤ 500 ms needs improvement, else poor.
 // The worst key is measured like an interaction: event.timeStamp → the first frame that shows it.
-export function inpLabel(ms) {
-  if (ms <= 200) return { text: 'INP: good', level: 'good' };
+// In a failed round the label is never green: the text stays true, the colour is neutral (and a
+// failed round with a worst key ≤ 200 ms means the work is too light: recalibrate, RUNBOOK).
+export function inpLabel(ms, failed = false) {
+  if (ms <= 200) return { text: 'INP: good', level: failed ? 'neutral' : 'good' };
   if (ms <= 500) return { text: 'INP: needs improvement', level: 'warn' };
   return { text: 'INP: poor', level: 'bad' };
 }
@@ -200,7 +202,29 @@ try {
   longTasksSupported = false;
 }
 
+// Draw every sprite and text the game uses once, off-screen, when the slide opens. Otherwise
+// the first frame that needs them (round 2: the frost poses, the 《Yield》 shield and its label)
+// pays for building them, and that frame shows up in the replay as a long frame that is our own
+// drawing, not React.
+function prewarmDrawing() {
+  for (let f = 0; f < FORMS.length; f++) for (const pose of ['breath', 'hurt', 'kneel', 'defeated']) poseCanvas(pose, f);
+  for (const n of Object.keys(PACK)) {
+    if (n.startsWith('dragon_')) continue;
+    packCanvas(n, n.startsWith('goblin_') ? { scale: GOBLIN_SCALE } : {});
+    if (n.startsWith('sword_') || n === 'slash_arc') packCanvas(n, { flip: true });
+  }
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const ctx = c.getContext('2d');
+  for (const size of [32, 40, 44, 48, 52, 72]) {
+    ctx.font = `${size}px DotGothic16`;
+    ctx.fillText('《Yield》 BITE! 0123456789 ms late frozen FINISH! TOO LATE RESPAWN AT ROOT -', 0, 32);
+  }
+}
+
 export function createGame(els) {
+  (document.fonts?.ready ?? Promise.resolve()).then(prewarmDrawing);
   const g = { round: 0, modeTitle: '', form: FORMS[0], dragon: makeDragon(DEFAULT_CELLS), ...freshRound() };
 
   const keysInRound = () => (g.lastKeySeq ? g.lastKeySeq - g.firstSeq + 1 : 0);
@@ -216,7 +240,7 @@ export function createGame(els) {
     setText(els.timer, `${(Math.max(0, t) / 1000).toFixed(1)} s`);
     setText(els.worstKey, g.latencies.length ? `${Math.round(g.worstKey)} ms` : '–');
     if (els.worstKey) els.worstKey.dataset.level = !g.latencies.length ? 'none' : g.worstKey > RULES.jankMs ? 'bad' : 'good';
-    const inp = g.latencies.length ? inpLabel(Math.round(g.worstKey)) : null;
+    const inp = g.latencies.length ? inpLabel(Math.round(g.worstKey), g.fallen) : null;
     setText(els.inp, inp ? inp.text : '');
     if (els.inp) els.inp.dataset.level = inp ? inp.level : 'none';
   }
@@ -280,7 +304,8 @@ export function createGame(els) {
       round: g.round + 1,
       mode: g.modeTitle,
       form: g.form.name,
-      outcome: g.outcome,
+      // A failed round is FAILED everywhere, even when the dragon went down (dragonDown says that).
+      outcome: questFailed ? 'FAILED' : g.outcome,
       dragonDown: g.outcome === 'WIN',
       questFailed,
       rank,
@@ -322,6 +347,7 @@ export function createGame(els) {
     play(rank === 'S' ? 'fanfare' : questFailed ? 'lose' : 'rank');
     if (g.outcome !== 'WIN') setTimeout(() => play('laugh'), 1300);
     renderResult();
+    els.onEnd?.();
   }
 
   // The audience sees one number: the worst keystroke. The rest is in data-result (and notes).
@@ -341,7 +367,7 @@ export function createGame(els) {
         </div>
         <div class="bo-rank rank-${r.rank}"><span>RANK</span>${r.rank}</div>
       </div>
-      <div class="bo-key"><span>worst key</span><b class="${r.worstLatencyMs > RULES.jankMs ? 'bad' : 'good'}">${r.worstLatencyMs} ms</b><i class="inp-${inpLabel(r.worstLatencyMs).level}">${inpLabel(r.worstLatencyMs).text}</i></div>
+      <div class="bo-key"><span>worst key</span><b class="${r.worstLatencyMs > RULES.jankMs ? 'bad' : 'good'}">${r.worstLatencyMs} ms</b><i class="inp-${inpLabel(r.worstLatencyMs, r.questFailed).level}">${inpLabel(r.worstLatencyMs, r.questFailed).text}</i></div>
       ${line ? `<div class="bo-line">${line}</div>` : ''}`;
   }
 
@@ -386,6 +412,8 @@ export function createGame(els) {
 
   return {
     state: g,
+    // All of the round's keys are in (the rest of the round is the list catching up).
+    roundFull: () => g.phase === 'fight' && keysInRound() >= g.roundKeys,
     rules: RULES,
     dragonBox: DRAGON_BOX,
     setRound(index, modeTitle) {

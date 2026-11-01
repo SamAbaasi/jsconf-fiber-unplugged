@@ -1,8 +1,10 @@
 // Calibration mode for the presentation laptop (key K on the boss slide).
 // Runs rounds 1–3 five times each with auto-type, with ONE setting (cells × µs per cell) for
 // all three rounds. It stops at the first setting where round 2 is S in ≥ 4/5 AND round 1 is
-// still C in ≥ 4/5 AND round 1's worst key (median of the 5 runs) is above 200 ms, the INP
-// "good" limit (CLAIMS L5). If round 1 is too fast, it adds work (µs per cell) in proportion.
+// still C in ≥ 4/5 AND round 1's worst key (median of the 5 runs) is in 230–320 ms: clearly above
+// the INP "good" limit of 200 ms (CLAIMS L5), so a failed round never reads "INP: good". If round 1
+// is too fast it adds work (µs per cell) in proportion, aiming at 275 ms; if it is slower than
+// 320 ms it takes work away the same way (round 2 must still be S).
 // If round 2 fails, it looks at the measured breakdown of round 2's worst frames (demo/phases.js):
 //   - mostly commit + style/layout/paint (DOM size) → fewer cells (next CELL_LEVEL), and more
 //     µs per cell so that cells × µs (the render work) stays about the same;
@@ -15,7 +17,9 @@ const STEP = 2; // µs, same as [ and ]
 const MIN_WORK = 2;
 const MAX_WORK = 80;
 const PASS = 4;
-const R1_KEY_MS = 200; // round 1's worst key must be above this (INP "good" limit, CLAIMS L5)
+// Round 1's worst key (median of 5): this band, aiming at the middle. 200 ms = INP "good" limit (L5).
+const R1_KEY = { min: 230, max: 320, aim: 275 };
+const MAX_ROWS = 8; // never more settings than this (each one is 15 rounds)
 const median = (a) => {
   const s = [...a].sort((x, y) => x - y);
   return s.length ? s[Math.floor(s.length / 2)] : 0;
@@ -119,29 +123,33 @@ export function runCalibration({ panel, game, setMode, autoType, getWork, setWor
       row.why = sum.n ? `render ${Math.round(sum.render / sum.n)} · DOM ${Math.round(sum.dom / sum.n)} ms` : 'no long frame';
       const r1Key = median(row.results[0].map((r) => r.worstLatencyMs || 0));
       row.why += ` · R1 key ${r1Key} ms`;
-      if (r2S >= PASS && r1C >= PASS && r1Key > R1_KEY_MS) {
+      const inBand = r1Key >= R1_KEY.min && r1Key <= R1_KEY.max;
+      if (r2S >= PASS && r1C >= PASS && inBand) {
         chosen = { cells, work };
         verdict = `Round 2 is S in ${r2S}/${RUNS}, round 1 is C in ${r1C}/${RUNS} with a worst key of ${r1Key} ms, with ${cells.toLocaleString('en-US')} cells × ${work} µs.`;
         break;
       }
       if (r2S >= PASS) {
-        // Round 1 is not slow enough (not C, or its worst key ≤ 200 ms): more work per cell.
-        if (r1C >= PASS) fallback = { cells, work, r1Key };
-        const next = Math.min(MAX_WORK, Math.max(work + STEP, Math.ceil((work * (R1_KEY_MS + 20)) / Math.max(1, r1Key))));
-        if (next > work) {
+        // Round 1 is outside the band (or not C): change the work per cell in proportion,
+        // aiming at 275 ms. Remember the setting closest to the band that passed.
+        if (r1C >= PASS && (!fallback || Math.abs(r1Key - R1_KEY.aim) < Math.abs(fallback.r1Key - R1_KEY.aim))) fallback = { cells, work, r1Key };
+        const tooSlow = r1C >= PASS && r1Key > R1_KEY.max;
+        let next = Math.round((work * R1_KEY.aim) / Math.max(1, r1Key));
+        next = tooSlow ? Math.max(MIN_WORK, Math.min(work - 1, next)) : Math.min(MAX_WORK, Math.max(work + 1, next));
+        if (next !== work && rows.length < MAX_ROWS) {
           work = next;
           continue;
         }
         chosen = fallback;
         verdict = fallback
-          ? `Round 1's worst key reaches only ${fallback.r1Key} ms even at ${MAX_WORK} µs; using ${fallback.cells.toLocaleString('en-US')} cells × ${fallback.work} µs.`
-          : `No setting works on this machine: round 1 is C in only ${r1C}/${RUNS} even at ${MAX_WORK} µs.`;
+          ? `Round 1's worst key stays outside 230–320 ms on this machine (closest: ${fallback.r1Key} ms); using ${fallback.cells.toLocaleString('en-US')} cells × ${fallback.work} µs.`
+          : `No setting works on this machine: round 1 is C in only ${r1C}/${RUNS} even at ${work} µs.`;
         break;
       }
       if (fallback) {
         // More work made round 2 fail: go back to the last setting that passed.
         chosen = fallback;
-        verdict = `Round 1's worst key is only ${fallback.r1Key} ms: more work makes round 2 fail on this machine. Using ${fallback.cells.toLocaleString('en-US')} cells × ${fallback.work} µs.`;
+        verdict = `Round 1's worst key is ${fallback.r1Key} ms (outside 230–320): more work makes round 2 fail on this machine. Using ${fallback.cells.toLocaleString('en-US')} cells × ${fallback.work} µs.`;
         break;
       }
       const nextCells = CELL_LEVELS[CELL_LEVELS.indexOf(cells) + 1];

@@ -156,6 +156,7 @@ export const slides = [
       '[CLICK] REPLAY round 1: whole round + 300 ms zoom. Yellow = one sync render per key. DRAFT: One key = one long sync render. Every key waits.',
       '[CLICK] Round 2 (useTransition): press A. Fiber-kun cuts goblins between slices; RESPAWN AT ROOT = a real thrown-away render (B2).',
       '[CLICK] REPLAY round 2: green 5 ms slices, keys between them, red boxes = thrown away. DRAFT: The list renders in 5 ms slices. Keys cut in between.',
+      'If replay 2 shows a red frame in an S round, it is real but not React blocking a key: no key waited > 50 ms. We measured it as either our own game drawing new sprites the first time (now pre-drawn when the slide opens), or the browser painting late while several 5 ms slices ran back to back (LoAF: no single task ≥ 50 ms).',
       '[CLICK] Round 3 (useDeferredValue): press A.',
       '[CLICK] REPLAY round 3. DRAFT: Same slices. I don’t own the setter, so I defer the value.',
       'DRAFT: If round 2 or 3 shows A instead of S: "A, not S. One key was late. These numbers are real, so the game does not lie for me."',
