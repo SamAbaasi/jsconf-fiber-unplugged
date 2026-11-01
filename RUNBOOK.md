@@ -32,7 +32,7 @@ Why two numbers? On a slow machine the long frames in round 2 are not the render
 2. Press **K**. A checklist appears on the right. Check every line.
 3. Press **K** again. Calibration starts. **Don't touch the keyboard or mouse.**
    - It plays rounds 1, 2, 3 five times (auto-type), about 2–3 minutes per setting.
-   - It starts at 12,144 cells × 19 µs (or your `?work`/`?cells` values).
+   - It starts at 12,144 cells × 18 µs (or your `?work`/`?cells` values).
    - If round 2 is not rank **S** in at least 4 of 5 runs, it looks at round 2's measured worst frames:
      - mostly **commit + style/layout/paint** → the next smaller DOM: 12,144 → 6,831 → 4,345 → 3,036 cells (6 / 8 / 10 / 12 px cells over the same ×12 dragon art), with more µs per cell so that cells × µs stays about the same;
      - mostly **render** → the next smaller DOM at the same µs (less render work too); at 3,036 cells, 2 µs less per cell (the same as the **[** key).
