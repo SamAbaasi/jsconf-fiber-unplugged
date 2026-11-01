@@ -89,7 +89,7 @@ export function BossFight({ step }) {
   // Only fed while in deferred mode; otherwise it holds null and never defers.
   const deferredText = useDeferredValue(mode.key === 'deferred' ? text : null);
 
-  const names = ['arena', 'world', 'fx', 'hydra', 'dragonKb', 'hydraName', 'timer', 'overlay', 'calib', 'hydraHpBar', 'hydraHpText', 'fps', 'worstKey'];
+  const names = ['arena', 'world', 'fx', 'hydra', 'dragonKb', 'hydraName', 'timer', 'overlay', 'calib', 'hydraHpBar', 'hydraHpText', 'fps', 'worstKey', 'inp'];
   const refs = Object.fromEntries(names.map((n) => [n, useRef(null)]));
   const inputRef = useRef(null);
   const typingTimer = useRef(0);
@@ -344,21 +344,26 @@ export function BossFight({ step }) {
         <div className={`boss-pending ${pending ? 'is-on' : ''}`}>{pending ? 'pending…' : ''}</div>
       </div>
 
-      {/* Right side during the fight: only two big numbers. The code is one line in the header. */}
+      {/* Bottom row, next to the search box: two big numbers. The code is one line in the header. */}
       <div className="win boss-big boss-big-fps" style={{ position: 'absolute' }}>
-        <div className="boss-big-label">FPS</div>
+        <div className="boss-big-side">
+          <div className="boss-big-label">FPS</div>
+        </div>
         <div className="boss-big-num boss-fps-num" ref={refs.fps}>
           60
         </div>
       </div>
       <div className="win boss-big boss-big-key" style={{ position: 'absolute' }}>
-        <div className="boss-big-label">worst key</div>
+        <div className="boss-big-side">
+          <div className="boss-big-label">worst key</div>
+          <div className="boss-inp" ref={refs.inp} />
+        </div>
         <div className="boss-big-num boss-key-num" ref={refs.worstKey}>
           –
         </div>
       </div>
 
-      {/* READY and RESULT panels cover the instruments between rounds, so the arena stays visible. */}
+      {/* READY and RESULT cards sit in the sky between the castle and the dragon. */}
       <div className="boss-overlay" ref={refs.overlay} />
       {/* REPLAY: the real timeline of the round that just ended, full screen. */}
       {replay && (

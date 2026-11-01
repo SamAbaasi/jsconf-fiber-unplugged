@@ -3,7 +3,7 @@
 // Because everything here runs on the main thread, it freezes when React blocks
 // the main thread. That freeze is the thing we want the audience to see.
 import { readSince } from '../instrument/eventLog.js';
-import { ARENA } from './game.js';
+import { packCanvas } from '../sprites/pack.js';
 
 const WINDOW_MS = 3000;
 const PRI_COLOR = { 1: '#ffd166', 2: '#ff5d73', 3: '#34e0a1', 4: '#4cc9f0', 5: '#a3a9c2' };
@@ -38,7 +38,7 @@ export function startMonitor(els, game) {
       if (fx) game.draw(fx, now);
     }
     prev = now;
-    if (els.world) drawWorld(els.world, now);
+    if (els.world) drawWorld(els.world);
     if (els.timeline) drawTimeline(els.timeline, state, now);
     if (els.fpsGraph) drawFpsGraph(els.fpsGraph, state, now);
     if (now - state.lastStatsAt > 200) {
@@ -123,52 +123,14 @@ function ingest(state, now, game) {
 }
 
 // ---------- arena background ----------
-
-let worldCache = null;
-function worldLayers(w, h) {
-  if (worldCache && worldCache.w === w && worldCache.h === h) return worldCache;
-  const sky = document.createElement('canvas');
-  sky.width = w;
-  sky.height = h;
-  const s = sky.getContext('2d');
-  const bands = ['#120f45', '#1b1660', '#24206f', '#2f2c86', '#3b3a9c', '#4a4bb0'];
-  bands.forEach((c, i) => {
-    s.fillStyle = c;
-    s.fillRect(0, (i * ARENA.groundY) / bands.length, w, ARENA.groundY / bands.length + 1);
-  });
-  // Pixel stars, fixed positions.
-  s.fillStyle = '#ffffff';
-  for (let i = 0; i < 60; i++) s.fillRect((i * 197) % w, (i * 89) % 300, i % 7 ? 3 : 6, i % 7 ? 3 : 6);
-  // Hills
-  s.fillStyle = '#231d66';
-  for (let x = 0; x < w; x += 8) {
-    const y = ARENA.groundY - 150 + Math.round((Math.sin(x / 90) * 30 + Math.sin(x / 37) * 10) / 8) * 8;
-    s.fillRect(x, y, 8, ARENA.groundY - y);
-  }
-  // Ground
-  for (let x = 0, k = 0; x < w; x += 32, k++) {
-    s.fillStyle = k % 2 ? '#2f7a3e' : '#38904a';
-    s.fillRect(x, ARENA.groundY, 32, h - ARENA.groundY);
-  }
-  s.fillStyle = '#5fd47a';
-  s.fillRect(0, ARENA.groundY, w, 6);
-  worldCache = { w, h, sky };
-  return worldCache;
-}
-
-function drawWorld(canvas, now) {
+// Saman's pack: arena_background (night sky, moon, a few stars, hills, grass) at ×12; its ground
+// top is at y = 690. Static: what moves (Fiber-kun, goblins) shows when frames stop.
+function drawWorld(canvas) {
   const ctx = canvas.getContext('2d');
-  const { width: w, height: h } = canvas;
+  if (canvas.dataset.drawn === '1') return;
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(worldLayers(w, h).sky, 0, 0);
-  // Two clouds drifting: they only move when frames run.
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
-  for (let i = 0; i < 2; i++) {
-    const x = Math.round(((now * (0.02 + i * 0.015) + i * 500) % (w + 300)) - 300);
-    const y = 80 + i * 90;
-    ctx.fillRect(x, y, 220, 32);
-    ctx.fillRect(x + 40, y - 24, 120, 24);
-  }
+  ctx.drawImage(packCanvas('arena_background'), 0, 0);
+  canvas.dataset.drawn = '1';
 }
 
 // ---------- FPS graph ----------

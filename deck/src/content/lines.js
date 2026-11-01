@@ -107,7 +107,7 @@ export const LINES = {
   replaySync: { by: 'draft', text: 'One key = one long sync render. Every key waits.', claims: ['A1', 'A4', 'C2'] },
   replayTransition: { by: 'draft', text: 'The list renders in 5 ms slices. Keys cut in between.', claims: ['A2', 'A4', 'C4', 'B2'] },
   replayDeferred: { by: 'draft', text: 'Same slices, with useDeferredValue.', claims: ['F1', 'F4', 'A4'] },
-  questFailedLine: { by: 'draft', text: 'You beat the dragon. The user already left.', claims: ['A1', 'A4'] },
+  questFailedLine: { by: 'draft', text: 'Your users felt every key.', claims: ['A1', 'A4'] },
 
   // Yield walk (slide "yield", steps 2–5). {wip} is filled from the real walk order.
   yWalk: { by: 'draft', speaker: 'Fiber-kun', face: 'normal', text: 'One fiber at a time. This bar is my 5 ms.', claims: ['A2', 'A7', 'C4'] },

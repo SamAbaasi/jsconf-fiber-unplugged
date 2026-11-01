@@ -20,8 +20,7 @@
 //   PERFECT:      the dragon falls, every window is lit, Fiber-kun raises his sword, fireworks.
 // All of this runs in the monitor's rAF loop, outside React.
 import { FIBER_KUN, FACES, PALETTE } from '../sprites/fiberkun.js';
-import { GOBLIN, GOBLIN_PALETTE } from '../sprites/goblin.js';
-import { drawSword } from '../sprites/sword.js';
+import { PACK, PACK_META, packCanvas, packBox } from '../sprites/pack.js';
 import { spriteCanvas } from '../ui/Sprite.jsx';
 import { makeDragon, poseCanvas, ART_PX, DRAGON_PX, DRAGON_POINTS, BASELINE_ROW, DEFAULT_CELLS } from './dragon.js';
 import { SCALES, bbox, reportBox } from '../sprites/scale.js';
@@ -36,6 +35,14 @@ export const RULES = {
   failRatio: 0.5, // the village falls when bites >= 50% of the keys resolved (after minKeys)
   maxRoundMs: 30000, // safety net only
 };
+
+// INP label for the worst key (CLAIMS L5): ≤ 200 ms good, ≤ 500 ms needs improvement, else poor.
+// The worst key is measured like an interaction: event.timeStamp → the first frame that shows it.
+export function inpLabel(ms) {
+  if (ms <= 200) return { text: 'INP: good', level: 'good' };
+  if (ms <= 500) return { text: 'INP: needs improvement', level: 'warn' };
+  return { text: 'INP: poor', level: 'bad' };
+}
 
 // Rank, decided only by real numbers. In the speaker notes; the audience sees the scene.
 export function rankOf({ bites, keys, worstKey, fallen }) {
@@ -57,8 +64,11 @@ export const FORMS = [
 ];
 
 // Proportions come from the scale bible (sprites/scale.js; checked by scripts/check-scale.mjs).
-// Fiber-kun, the goblins and the dragon are all drawn on the same ×12 pixel grid.
-export const ARENA = { w: 1330, h: SCALES.boss.arenaH, groundY: 690 };
+// Everything is Saman's pixel pack (or Fiber-kun) on the same ×12 grid. Full-width arena:
+//   castle (your UI) at the left · goblins between the castle and Fiber-kun · Fiber-kun ·
+//   an empty gap · the dragon, right-aligned. Nothing stands between Fiber-kun and the dragon.
+const PX = 12;
+export const ARENA = { w: 1860, h: SCALES.boss.arenaH, groundY: 690 };
 const DRAGON_W = DRAGON_PX.w;
 const DRAGON_H = DRAGON_PX.h;
 // Right edge 24 px inside the arena (5 px border), so the 12 px knockback never clips the tail.
@@ -67,60 +77,36 @@ const SHAPE_W = 59 * ART_PX;
 export const DRAGON_BOX = { x: ARENA.w - 5 - SHAPE_W - 24, y: ARENA.groundY - (BASELINE_ROW + 1) * ART_PX, w: DRAGON_W, h: DRAGON_H };
 const HERO_SCALE = SCALES.boss.hero;
 const HERO_SIZE = 16 * HERO_SCALE;
-const SWORD = 1.05; // sword scale, matched to the hero size
-const REACH = 148; // slash arc radius = blade tip (142 px × SWORD)
-const HERO_HOME = 216; // Fiber-kun's left edge, just right of the castle (same in every round)
-// Dash so the blade tip passes the dragon's chest at the contact frame (computed, not tuned).
+const HERO_HOME = 640; // Fiber-kun's left edge (same in every round)
+// His right hand on the 16×16 sprite (column 12, row 10): the sword's hilt goes there.
+const HAND = { col: 12, row: 10 };
+const SWORD_META = PACK_META.sword;
+// The slash crescent reaches this far right of the hand (slash_arc's right edge − its centre).
+const SLASH_REACH = (packBox('slash_arc').x + packBox('slash_arc').w - SWORD_META.slash_arc.anchor_centre[0]) * PX;
+// Dash so the crescent reaches the dragon's chest at the contact frame (computed, not tuned).
 const CHEST = [DRAGON_BOX.x + DRAGON_POINTS.chest[0] * ART_PX, DRAGON_BOX.y + DRAGON_POINTS.chest[1] * ART_PX];
 const HEAD = [DRAGON_BOX.x + DRAGON_POINTS.head[0] * ART_PX, DRAGON_BOX.y + DRAGON_POINTS.head[1] * ART_PX];
-const HAND_Y = ARENA.groundY - HERO_SIZE + HERO_SIZE * 0.62;
-const HAND_X = CHEST[0] - Math.sqrt(REACH ** 2 - (HAND_Y - CHEST[1]) ** 2);
-const CONTACT_ANGLE = Math.atan2(CHEST[1] - HAND_Y, CHEST[0] - HAND_X);
-const HERO = { homeX: HERO_HOME, scale: HERO_SCALE, size: HERO_SIZE, dash: Math.round(HAND_X - (HERO_HOME + HERO_SIZE - 24)) };
+const HERO = { homeX: HERO_HOME, scale: HERO_SCALE, size: HERO_SIZE, dash: Math.round(CHEST[0] - SLASH_REACH - (HAND.col + 0.5) * PX - HERO_HOME) };
 const GOBLIN_SCALE = SCALES.boss.goblin;
-const GOBLIN_W = 8 * GOBLIN_SCALE;
-const GOBLIN_SLOTS = [420, 500]; // waiting goblins: right of Fiber-kun; late ones run past him to the castle
-// Never more than this many goblins on screen at once (the rest still count, they are just not drawn).
-const MAX_GOBLINS_SHOWN = 3;
+const GOBLIN_W = PACK.goblin_walk1.w * GOBLIN_SCALE; // 168
+const GOBLIN_H = PACK.goblin_walk1.h * GOBLIN_SCALE; // 180
+// The castle: castle_* sprites (34 × 35) at ×12, bottom on the ground. Stone starts at row 11;
+// the rows above are for the flames.
+const CASTLE = { x: 20, y: ARENA.groundY - PACK.castle_intact.h * PX, w: PACK.castle_intact.w * PX, stoneTop: ARENA.groundY - 24 * PX };
+// Waiting goblins: between the castle and Fiber-kun (more than three overlap on the last spot).
+const GOBLIN_SLOTS = [HERO_HOME - GOBLIN_W + 12, HERO_HOME - GOBLIN_W - 36, HERO_HOME - GOBLIN_W - 84];
+// Late goblins bite the castle here (left edge of the goblin), then dance in front of it.
+const BITE_SPOTS = [CASTLE.x + 230, CASTLE.x + 130, CASTLE.x + 30];
+const DANCE_SPOTS = [CASTLE.x + 40, CASTLE.x + 200];
+// Never more than this many goblins drawn at once (the rest still count; they are just not drawn).
+const MAX_GOBLINS_SHOWN = 3; // Saman: three, not more
 const DASH_MS = 90;
 const SLASH_MS = 80;
 const RETURN_MS = 150;
-// Contact: the moment the slash (from −2.3 to +1.0 rad) passes the chest angle.
-const IMPACT_AT = DASH_MS + Math.round(SLASH_MS * ((CONTACT_ANGLE + 2.3) / 3.3));
-const WHITE_GOBLIN = Object.fromEntries(Object.entries(GOBLIN_PALETTE).map(([k]) => [k, '#ffffff']));
-
-// The village = your UI: a small castle on the ×12 grid (two towers, a wall, a gate), with six
-// lit windows; each bite darkens one. It falls when the bite ratio reaches RULES.failRatio.
-const PX = 12;
-const TOWERS = [12, 132]; // x of the two towers, 6 PX wide
-const TOWER_TOP = ARENA.groundY - 11 * PX;
-const WALL = { x: 84, w: 4 * PX, top: ARENA.groundY - 6 * PX };
-const WINDOWS = 6;
-// Crack lines in the stone, one per bite (6 px steps on the 12 px grid), in a fixed order.
-const crack = (x, y, steps) => steps.map(([dx, dy]) => [x + dx * 6, y + dy * 6]);
-const CRACKS = [
-  crack(TOWERS[0] + 8, ARENA.groundY - 108, [[0, 0], [1, 1], [1, 2], [2, 3], [2, 4], [3, 5]]),
-  crack(TOWERS[1] + 40, ARENA.groundY - 120, [[0, 0], [-1, 1], [-1, 2], [0, 3], [-1, 4], [-2, 5]]),
-  crack(84 + 6, ARENA.groundY - 66, [[0, 0], [1, 1], [2, 1], [3, 2], [4, 3]]),
-  crack(TOWERS[0] + 44, ARENA.groundY - 60, [[0, 0], [0, 1], [-1, 2], [-1, 3], [-2, 4]]),
-  crack(TOWERS[1] + 8, ARENA.groundY - 54, [[0, 0], [1, 1], [1, 2], [2, 3]]),
-  crack(84 + 18, ARENA.groundY - 30, [[0, 0], [-1, 1], [0, 2], [1, 3]]),
-];
-// Where the goblins that got in dance: on the ground in front of the castle, below the flames.
-const DANCE_SPOTS = [WALL.x + WALL.w / 2]; // one goblin, in front of the gate
-const ROOF_TOP = TOWER_TOP; // highest stone (kept for the text positions)
-// Where goblins stand once they got in, and where the fire burns: the two tower tops and the wall.
-const PERCHES = [
-  { cx: TOWERS[0] + 3 * PX, top: TOWER_TOP - PX },
-  { cx: WALL.x + WALL.w / 2, top: WALL.top - PX },
-  { cx: TOWERS[1] + 3 * PX, top: TOWER_TOP - PX },
-];
-// Windows: three per tower, filled in order left, right, left, right…
-const windowRect = (i) => {
-  const t = TOWERS[i % 2];
-  const k = Math.floor(i / 2);
-  return { x: t + 2 * PX, y: TOWER_TOP + (1 + k * 3) * PX, w: 2 * PX, h: 2 * PX };
-};
+// Contact: the middle of the slash, when the crescent is at the chest.
+const IMPACT_AT = DASH_MS + Math.round(SLASH_MS / 2);
+// Where smoke rises when the castle burns (the flames of castle_burning).
+const SMOKE_SPOTS = [CASTLE.x + 4 * PX, CASTLE.x + 13 * PX, CASTLE.x + 21 * PX, CASTLE.x + 29 * PX];
 
 // A small log of landed hits, so tests can find the frames where contact happens.
 const hitLog = (globalThis.__fiberHits = globalThis.__fiberHits || []);
@@ -129,29 +115,12 @@ function logHit(type, t) {
   if (hitLog.length > 500) hitLog.shift();
 }
 
-// Screen position of a dragon cell's centre.
-const cellPos = (d, i) => [DRAGON_BOX.x + ((i % d.cols) + 0.5) * d.cellPx, DRAGON_BOX.y + (Math.floor(i / d.cols) + 0.5) * d.cellPx];
-
 const FALL_MS = 700;
 const ICE_HOLD = 400; // the frozen ice beam is held this long…
 const ICE_SHATTER = 300; // …then it shatters
-// The 《Yield》 shield (8 × 12, drawn on the ×12 grid like Fiber-kun): a pause sign on it.
-const SHIELD_PALETTE = { k: '#120c2c', s: '#9aa3c7', S: '#6b7396', g: '#34e0a1', w: '#ffffff' };
-const SHIELD = [
-  'kkkkkkkk',
-  'kssssssk',
-  'ksgsgssk',
-  'ksgsgssk',
-  'ksgsgsSk',
-  'ksgsgsSk',
-  'ksssssSk',
-  'kssssSSk',
-  '.ksssSk.',
-  '.kssSSk.',
-  '..kSSk..',
-  '...kk...',
-];
-const PUFF_MS = 480; // an ice shard travels from the mouth to the shield (several in flight = a dotted stream)
+// Rounds 2–3: ice shards fly at this speed, so shards from consecutive slices stay apart.
+const SHARD_SPEED = 2.4; // px per ms
+const SHARD_GAP_MS = 24; // at most one shard per this many ms (slices in the same frame = one shard)
 const HURT_MS = 160; // the hurt pose after each hit
 const formIndex = (form) => Math.max(0, FORMS.indexOf(form));
 
@@ -186,7 +155,6 @@ function freshRound() {
     goblinCount: 0,
     bites: 0,
     biteDamage: 0,
-    darkWindows: 0, // windows gone dark = bites that reached the village
     latencies: [],
     worstKey: 0, // only grows during a round
     worst: 0,
@@ -239,6 +207,8 @@ export function createGame(els) {
   const keyIndex = (seq) => seq - g.firstSeq + 1;
 
   function updateHud() {
+    const ready = g.phase === 'ready';
+    if (els.arena && els.arena.classList.contains('is-ready') !== ready) els.arena.classList.toggle('is-ready', ready);
     const max = Math.max(1, g.dragonMax);
     setWidth(els.hydraHpBar, g.phase === 'ready' ? 1 : g.dragonHp / max);
     setText(els.hydraHpText, `keys ${keysInRound()} / ${g.roundKeys} · HP ${g.phase === 'ready' ? g.roundKeys : g.dragonHp}`);
@@ -246,6 +216,9 @@ export function createGame(els) {
     setText(els.timer, `${(Math.max(0, t) / 1000).toFixed(1)} s`);
     setText(els.worstKey, g.latencies.length ? `${Math.round(g.worstKey)} ms` : '–');
     if (els.worstKey) els.worstKey.dataset.level = !g.latencies.length ? 'none' : g.worstKey > RULES.jankMs ? 'bad' : 'good';
+    const inp = g.latencies.length ? inpLabel(Math.round(g.worstKey)) : null;
+    setText(els.inp, inp ? inp.text : '');
+    if (els.inp) els.inp.dataset.level = inp ? inp.level : 'none';
   }
 
   function showReady() {
@@ -368,7 +341,7 @@ export function createGame(els) {
         </div>
         <div class="bo-rank rank-${r.rank}"><span>RANK</span>${r.rank}</div>
       </div>
-      <div class="bo-key"><span>worst key</span><b class="${r.worstLatencyMs > RULES.jankMs ? 'bad' : 'good'}">${r.worstLatencyMs} ms</b></div>
+      <div class="bo-key"><span>worst key</span><b class="${r.worstLatencyMs > RULES.jankMs ? 'bad' : 'good'}">${r.worstLatencyMs} ms</b><i class="inp-${inpLabel(r.worstLatencyMs).level}">${inpLabel(r.worstLatencyMs).text}</i></div>
       ${line ? `<div class="bo-line">${line}</div>` : ''}`;
   }
 
@@ -500,7 +473,7 @@ export function createGame(els) {
       if (g.phase !== 'fight' || t < g.startAt) return;
       const now = performance.now();
       const last = g.puffs[g.puffs.length - 1];
-      if (last && now - last.t0 < 20) return; // two slices in the same frame: one visible shard
+      if (last && now - last.t0 < SHARD_GAP_MS) return; // slices in the same frame: one visible shard
       g.puffs.push({ t0: now });
       if (g.puffs.length > 40) g.puffs.shift();
     },
@@ -560,20 +533,18 @@ export function createGame(els) {
             if (!(a && a.kind === 'dash' && now - a.t0 < DASH_MS + SLASH_MS + RETURN_MS)) g.action = { kind: 'goblin', t0: now };
           }
         }
-        // The goblin runs into the village; at contact a window goes dark.
+        // The goblin runs to the castle; at contact it bites (smoke, the castle cracks).
         if (gb.state === 'bite' && !gb.bitten && now - gb.t0 >= 160) {
           gb.bitten = true;
           g.biteDamage += gb.latency;
-          g.darkWindows = Math.min(WINDOWS, g.darkWindows + 1);
-          const w = windowRect(Math.min(gb.window, WINDOWS - 1));
-          g.sparks.push({ x: w.x + PX / 2, y: w.y + PX, t0: now, smoke: true });
+          g.sparks.push({ x: BITE_SPOTS[gb.window % BITE_SPOTS.length] + GOBLIN_W / 2, y: ARENA.groundY - GOBLIN_H, t0: now, smoke: true });
           g.shake = Math.min(14, 4 + gb.latency / 30);
           g.shakeAt = now;
           headText(`BITE! ${gb.latency} ms late`, '#ff5d73', now);
           play('hit');
         }
-        // After biting, it stays and dances on the ground in front of the castle (one at most),
-        // or vanishes.
+        // After biting, it stays and dances on the ground in front of the castle (two at most,
+        // never on the flames), or vanishes.
         if (gb.state === 'bite' && now - gb.t0 >= 360) {
           const onRoofs = g.goblins.filter((x) => x.state === 'roof').length;
           if (onRoofs < DANCE_SPOTS.length) {
@@ -588,7 +559,6 @@ export function createGame(els) {
         if (gb.state === 'dying' && !gb.cut && !gb.quiet && now - gb.t0 >= 70) {
           gb.cut = true;
           logHit('goblin', now);
-          g.sparks.push({ x: GOBLIN_SLOTS[0] + GOBLIN_W / 2, y: ARENA.groundY - 48, t0: now });
           play('dodge');
         }
         if (gb.state === 'dying' && now - gb.t0 >= 320) gb.state = 'dead';
@@ -605,10 +575,10 @@ export function createGame(els) {
         g.kbUntil = now + 130;
         g.shake = 8;
         g.shakeAt = now;
-        g.sparks.push({ x: CHEST[0], y: CHEST[1], t0: now, big: true });
         const late = imp.final && g.fallen;
         if (imp.dmg > 0 || imp.final)
-          g.floaters.push({ text: imp.final ? (late ? 'TOO LATE' : 'FINISH!') : `-${imp.dmg}`, x: CHEST[0] + 40, y: CHEST[1] - 90, t0: now, color: imp.final ? (late ? '#a3a9c2' : '#ffd166') : '#7dffc8', size: imp.final ? 72 : 52 });
+          // above the dragon's shoulder, right of its horns (not on its neck or chest)
+          g.floaters.push({ text: imp.final ? (late ? 'TOO LATE' : 'FINISH!') : `-${imp.dmg}`, x: DRAGON_BOX.x + 21 * ART_PX, y: DRAGON_BOX.y + 20, t0: now, color: imp.final ? (late ? '#a3a9c2' : '#ffd166') : '#7dffc8', size: imp.final ? 72 : 52 });
         play('hit');
         if (imp.final) finish(now, 'WIN');
       }
@@ -673,7 +643,7 @@ export function createGame(els) {
       // after the long frame). Rounds 2–3: ice shards, one per real slice, on the 《Yield》 shield.
       const iceAge = g.breath ? now - g.breath.t0 : Infinity;
       const ice = iceAge < ICE_HOLD + ICE_SHATTER;
-      g.puffs = g.puffs.filter((p) => now - p.t0 < PUFF_MS);
+      g.puffs = g.puffs.filter((p) => (now - p.t0) * SHARD_SPEED < 420);
       const puffing = g.puffs.length > 0;
       const breathing = !g.fallAt && (ice || puffing);
       // The ice beam keeps the breath pose (the beam starts at its mouth); otherwise a hit shows the
@@ -685,7 +655,6 @@ export function createGame(els) {
       if (!g.fallAt && puffing && !hurt) drawPuffs(ctx, now);
       drawVillage(ctx, now);
       drawGoblins(ctx, now);
-      drawVillageFire(ctx, now);
       drawHero(ctx, now);
       if (!g.fallAt && ice) drawIce(ctx, now, g.breath, iceAge);
 
@@ -707,20 +676,21 @@ export function createGame(els) {
         }
       }
 
-      // Bite numbers: over the village, where the goblins bite. Never on Fiber-kun or the dragon.
-      g.headLog = g.headLog.filter((h) => now - h.t0 < 1300);
-      ctx.font = '40px DotGothic16';
-      g.headLog.slice(-2).forEach((h, i, list) => {
-        const age = (now - h.t0) / 1300;
+      // Bite number: only the latest one, rising above the castle (never a stack in a corner,
+      // never on Fiber-kun or the dragon).
+      g.headLog = g.headLog.filter((h) => now - h.t0 < 1000);
+      const h = g.headLog[g.headLog.length - 1];
+      if (h) {
+        const age = (now - h.t0) / 1000;
         ctx.globalAlpha = 1 - age * age;
-        const y = ROOF_TOP - 230 - (list.length - 1 - i) * 46; // above the flag
-        ctx.textAlign = 'left';
+        ctx.font = '44px DotGothic16';
+        const bx = CASTLE.x + CASTLE.w / 2 + 40;
+        const by = CASTLE.stoneTop - 13 * PX - 40 - Math.round(age * 30);
         ctx.fillStyle = '#05071a';
-        ctx.fillText(h.text, 20, y + 4);
+        ctx.fillText(h.text, bx + 4, by + 4);
         ctx.fillStyle = h.color;
-        ctx.fillText(h.text, 16, y);
-        ctx.textAlign = 'center';
-      });
+        ctx.fillText(h.text, bx, by);
+      }
       ctx.globalAlpha = 1;
 
       // Numbers at dragon impact points.
@@ -744,40 +714,23 @@ export function createGame(els) {
         ctx.fillText(g.notice.text, ARENA.w / 2, 330);
       }
       if (r) drawEnding(ctx, now, r);
+      // The cave mouth (arena_frame) over everything: the boss room opens onto the village.
+      ctx.drawImage(packCanvas('arena_frame'), 0, 0);
     },
   };
 
-  // ---------- the village (your UI): a small castle ----------
+  // ---------- the village (your UI): the castle ----------
+  // castle_intact → castle_cracked (after the first bite) → castle_burning (fallen; two flame
+  // frames). The flag on the left tower is the health bar: "your UI".
   function drawVillage(ctx, now) {
     const fallen = g.fallen;
-    const stone = '#7a74ad';
-    const light = '#9a94cc';
-    const shade = '#565088';
-    // wall with crenellations and a gate
-    ctx.fillStyle = stone;
-    ctx.fillRect(WALL.x, WALL.top, WALL.w, ARENA.groundY - WALL.top);
-    ctx.fillStyle = light;
-    for (let k = 0; k < WALL.w / PX; k += 2) ctx.fillRect(WALL.x + k * PX, WALL.top - PX, PX, PX);
-    ctx.fillStyle = shade;
-    ctx.fillRect(WALL.x, WALL.top + 2 * PX, WALL.w, PX / 2);
-    ctx.fillStyle = '#1a1430';
-    ctx.fillRect(WALL.x + PX, ARENA.groundY - 3 * PX, 2 * PX, 3 * PX);
-    // towers with crenellations and a flag
-    for (const tx of TOWERS) {
-      ctx.fillStyle = stone;
-      ctx.fillRect(tx, TOWER_TOP, 6 * PX, ARENA.groundY - TOWER_TOP);
-      ctx.fillStyle = shade;
-      ctx.fillRect(tx + 5 * PX, TOWER_TOP, PX, ARENA.groundY - TOWER_TOP);
-      ctx.fillStyle = light;
-      for (let k = 0; k < 6; k += 2) ctx.fillRect(tx + k * PX, TOWER_TOP - PX, PX, PX);
-    }
-    // The flag = the castle's health bar: "your UI". It empties as keys bite and is empty exactly
-    // when the castle falls (bite ratio ≥ failRatio, after minKeys keys).
-    const health = g.fallen ? 0 : Math.max(0, 1 - g.bites / Math.max(g.resolved, RULES.minKeys) / RULES.failRatio);
-    const poleX = TOWERS[0] + PX;
-    const poleTop = TOWER_TOP - 14 * PX;
+    // The flag = the castle's health bar. It empties as keys bite and is empty exactly when the
+    // castle falls (bite ratio ≥ failRatio, after minKeys keys).
+    const health = fallen ? 0 : Math.max(0, 1 - g.bites / Math.max(g.resolved, RULES.minKeys) / RULES.failRatio);
+    const poleX = CASTLE.x + 4 * PX; // left tower (columns 1–7)
+    const poleTop = CASTLE.stoneTop - 13 * PX;
     ctx.fillStyle = '#8a5a2b';
-    ctx.fillRect(poleX, poleTop, PX / 2, TOWER_TOP - PX - poleTop);
+    ctx.fillRect(poleX, poleTop, PX / 2, CASTLE.stoneTop - poleTop);
     const flagX = poleX + PX / 2;
     const flagW = 13 * PX;
     const wave = fallen ? 0 : (Math.floor(now / 250) % 2) * 4;
@@ -788,71 +741,69 @@ export function createGame(els) {
     ctx.font = '32px DotGothic16';
     ctx.fillStyle = health > 0.35 ? '#120c2c' : '#c9cdf5';
     ctx.fillText('your UI', flagX + flagW / 2, poleTop + wave + 2 * PX);
-    // Windows: dark, no lights. Each bite = a crack in the stone (fixed places, in order).
-    for (let i = 0; i < WINDOWS; i++) {
-      const wr = windowRect(i);
-      ctx.fillStyle = '#1a1430';
-      ctx.fillRect(wr.x, wr.y, wr.w, wr.h);
-    }
-    ctx.fillStyle = '#1a1430';
-    for (let i = 0; i < Math.min(g.darkWindows, CRACKS.length); i++) {
-      for (const [cx, cy] of CRACKS[i]) ctx.fillRect(cx, cy, PX / 2, PX / 2);
-    }
+    const name = fallen ? (Math.floor(now / 150) % 2 ? 'castle_burning_f2' : 'castle_burning') : g.bites > 0 ? 'castle_cracked' : 'castle_intact';
+    ctx.drawImage(packCanvas(name), CASTLE.x, CASTLE.y);
+    const cb = packBox('castle_intact');
+    reportBox('boss', 'castle', { x: CASTLE.x + cb.x * PX, y: CASTLE.y + cb.y * PX, w: cb.w * PX, h: cb.h * PX });
   }
 
-  // The castle falls: fire on the towers and the wall, from the moment it falls until the reset.
-  // Drawn after the goblins, so the goblins never hide it.
-  function drawVillageFire(ctx, now) {
-    if (!g.fallen) return;
-    for (let p = 0; p < PERCHES.length; p++) {
-      if (p === 1) continue; // no fire on the wall: the dancing goblin stands in front of it
-      const { cx, top } = PERCHES[p];
-      for (let k = 0; k < 5; k++) {
-        const flick = Math.floor(now / 90 + k * 1.7 + p) % 3;
-        ctx.fillStyle = flick === 0 ? '#ffd166' : flick === 1 ? '#ff9f1c' : '#ff5d73';
-        ctx.fillRect(cx - 30 + k * 12, top - flick * 8 - (k % 2) * 10, PX, 2 * PX + flick * 8);
-      }
-    }
-  }
-
+  // Goblins: three at most on screen. The ones still in play (waiting, running to bite, being
+  // cut) first; the ones that got in dance in front of the castle with what room is left.
   function drawGoblins(ctx, now) {
+    const active = g.goblins.filter((gb) => gb.state !== 'roof');
+    const dancers = g.goblins.filter((gb) => gb.state === 'roof');
+    const list = [...active, ...dancers].slice(0, MAX_GOBLINS_SHOWN);
     let slot = 0;
-    let shown = 0;
-    for (const gb of g.goblins) {
-      if (shown >= MAX_GOBLINS_SHOWN) break;
-      const frame = GOBLIN[Math.floor(now / 160) % 2];
+    const step = Math.floor(now / 160) % 2;
+    for (const gb of list) {
+      let name = step ? 'goblin_walk2' : 'goblin_walk1';
       let x = GOBLIN_SLOTS[Math.min(slot, GOBLIN_SLOTS.length - 1)];
-      let y = ARENA.groundY - GOBLIN_W;
-      let palette = GOBLIN_PALETTE;
+      let y = ARENA.groundY - GOBLIN_H;
       let alpha = 1;
-      if (gb.state === 'wait') slot++;
+      if (gb.state === 'wait') {
+        gb.x = x;
+        slot++;
+      }
       if (gb.state === 'bite') {
-        // Run into the village: from its slot to the window it darkens.
-        const w = windowRect(Math.min(gb.window, WINDOWS - 1));
+        // Run to the castle, then bite it.
+        const from = gb.x ?? GOBLIN_SLOTS[0];
+        const to = BITE_SPOTS[gb.window % BITE_SPOTS.length];
         const p = Math.min(1, (now - gb.t0) / 160);
-        x = GOBLIN_SLOTS[0] + (w.x - GOBLIN_W / 2 - GOBLIN_SLOTS[0]) * p;
+        x = from + (to - from) * p;
+        if (p >= 1) name = 'goblin_bite';
       }
       if (gb.state === 'roof') {
         // Dancing on the ground in front of the castle (never on the flames).
-        x = DANCE_SPOTS[gb.house] - GOBLIN_W / 2;
-        y = ARENA.groundY - GOBLIN_W - Math.abs(Math.sin(now / 140 + gb.house)) * 14;
+        name = 'goblin_dance';
+        x = DANCE_SPOTS[gb.house];
+        y = ARENA.groundY - GOBLIN_H - Math.abs(Math.sin(now / 140 + gb.house)) * 14;
       }
       if (gb.state === 'dying') {
         const t = now - gb.t0;
+        x = gb.x ?? GOBLIN_SLOTS[0];
         if (gb.quiet) alpha = 1 - t / 320;
-        else if (t >= 70 && t < 160) palette = WHITE_GOBLIN; // hit flash at the contact frame
-        else if (t >= 160) alpha = 1 - (t - 160) / 160;
-        if (!gb.quiet) x = GOBLIN_SLOTS[0] + Math.max(0, t - 70) * 0.25; // small knockback (to the right)
+        else {
+          if (t >= 70) name = 'goblin_hit'; // cut at the contact frame
+          if (t >= 160) alpha = 1 - (t - 160) / 160;
+          x -= Math.max(0, t - 70) * 0.25; // small knockback (away from Fiber-kun, to the left)
+        }
       }
       if (alpha <= 0) continue;
-      shown++;
-      const img = spriteCanvas(frame, palette, GOBLIN_SCALE);
       ctx.globalAlpha = Math.max(0, alpha);
-      ctx.drawImage(img, Math.round(x), Math.round(y));
+      ctx.drawImage(packCanvas(name, { scale: GOBLIN_SCALE }), Math.round(x), Math.round(y));
       ctx.globalAlpha = 1;
-      const gbb = bbox(GOBLIN[0]);
+      const gbb = packBox('goblin_walk1');
       if (alpha === 1) reportBox('boss', 'goblin', { x, y: y + gbb.y * GOBLIN_SCALE, w: gbb.w * GOBLIN_SCALE, h: gbb.h * GOBLIN_SCALE });
     }
+  }
+
+  // A pack sprite placed so that its anchor pixel sits on (x, y). Flipped: mirrored around it.
+  function drawAnchored(ctx, name, anchor, x, y, flip = false, alpha = 1) {
+    const img = packCanvas(name, { flip });
+    const ax = flip ? PACK[name].w - 1 - anchor[0] : anchor[0];
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(img, Math.round(x - (ax + 0.5) * PX), Math.round(y - (anchor[1] + 0.5) * PX));
+    ctx.globalAlpha = 1;
   }
 
   function drawHero(ctx, now) {
@@ -863,7 +814,7 @@ export function createGame(els) {
     ctx.fillRect(x + 32, ARENA.groundY - 6, HERO.size - 64, 12);
 
     if (result && result.questFailed) {
-      // Defeated: kneels with the head down, gloom lines above, tears; the sword is broken.
+      // Defeated: kneels with the head down, gloom lines above, tears; his sword dropped.
       const img = spriteCanvas(FIBER_KUN.rest[0], PALETTE, HERO.scale);
       ctx.drawImage(img, x, ARENA.groundY - img.height + PX);
       ctx.fillStyle = '#4b4f9e';
@@ -872,13 +823,16 @@ export function createGame(els) {
       const drop = (now / 6) % 60;
       ctx.fillRect(x + 4 * PX, ARENA.groundY - 8 * PX + drop, PX / 2, PX);
       ctx.fillRect(x + 11 * PX, ARENA.groundY - 8 * PX + ((drop + 30) % 60), PX / 2, PX);
-      drawBrokenSword(ctx, x + HERO.size - 8, ARENA.groundY - 40);
+      // his sword lies on the ground next to him
+      const ss = packCanvas('sword_strike');
+      ctx.drawImage(ss, x + HERO.size - 2 * PX, ARENA.groundY - ss.height + 2 * PX);
       return;
     }
 
     const a = g.action;
     const t = a ? now - a.t0 : Infinity;
-    const facingLeft = false; // goblins and the dragon are both on his right
+    // He faces the dragon (right); he turns left to cut a goblin (goblins are on the castle side).
+    const facingLeft = !!(a && a.kind === 'goblin' && t < 260);
     const singed = now - g.fkHitAt < 300 && !result; // flinch while the dragon's ice hits him
     const frame = g.fkY > 0 ? FIBER_KUN.walk[0] : singed ? FACES.shocked : result && result.rank === 'S' ? FACES.smug : FIBER_KUN.idle[Math.floor(now / 300) % 2];
     const img = spriteCanvas(frame, PALETTE, HERO.scale);
@@ -911,39 +865,34 @@ export function createGame(els) {
     }
     ctx.restore();
 
-    // Sword
-    const front = facingLeft ? x + 24 : x + HERO.size - 24;
-    const handY = y + HERO.size * 0.62;
-    let angle = 0.3; // at rest: blade forward and a little down, above the ground
-    let trail = null;
-    if (result && result.rank === 'S') angle = -Math.PI / 2;
-    else if (result) angle = -0.8;
+    // The pixel sword (sword_ready / sword_up / sword_strike), hilt on his hand, and the pixel
+    // slash crescent (slash_arc) centred on the hand while he strikes.
+    const hand = handPoint(x, y, facingLeft);
+    let sword = 'sword_ready';
+    let slash = 0; // crescent opacity
+    if (result && result.rank === 'S') sword = 'sword_up';
+    else if (result) sword = 'sword_ready';
     else if (a && a.kind === 'dash' && t < DASH_MS + SLASH_MS + RETURN_MS) {
-      if (t < DASH_MS) angle = -2.3;
+      if (t < DASH_MS) sword = 'sword_up';
       else if (t < DASH_MS + SLASH_MS) {
-        const p = (t - DASH_MS) / SLASH_MS;
-        angle = -2.3 + 3.3 * p;
-        trail = { from: -2.3, to: angle };
-      } else angle = 1.0;
+        sword = 'sword_strike';
+        slash = 1;
+      } else sword = 'sword_strike';
     } else if (a && a.kind === 'goblin' && t < 260) {
-      const p = Math.min(1, t / 140);
-      angle = -2.3 + 3.3 * p;
-      if (t < 200) trail = { from: -2.3, to: angle };
-    } else if (g.attempting && g.phase === 'fight') {
-      angle = -1.3 + Math.sin(now / 90) * 0.08; // stance while React renders the list
-    }
-    if (trail) {
-      ctx.save();
-      ctx.translate(front, handY);
-      if (facingLeft) ctx.scale(-1, 1);
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-      ctx.lineWidth = 18;
-      ctx.beginPath();
-      ctx.arc(0, 0, REACH, trail.from, trail.to);
-      ctx.stroke();
-      ctx.restore();
-    }
-    drawSword(ctx, front, handY, angle, { scale: SWORD, flip: facingLeft });
+      if (t < 50) sword = 'sword_up';
+      else {
+        sword = 'sword_strike';
+        if (t < 170) slash = 1 - (t - 50) / 120;
+      }
+    } else if (g.attempting && g.phase === 'fight') sword = 'sword_up'; // stance while React renders the list
+    drawAnchored(ctx, sword, SWORD_META[sword].anchor_hilt, hand[0], hand[1], facingLeft);
+    if (slash > 0) drawAnchored(ctx, 'slash_arc', SWORD_META.slash_arc.anchor_centre, hand[0], hand[1], facingLeft, slash);
+  }
+
+  // His sword hand on screen (the sprite is mirrored when he faces left).
+  function handPoint(x, y, facingLeft) {
+    const col = facingLeft ? 15 - HAND.col : HAND.col;
+    return [x + (col + 0.5) * PX, y + (HAND.row + 0.5) * PX];
   }
 
   // ---------- the dragon's breath ----------
@@ -1020,34 +969,30 @@ export function createGame(els) {
   // mouth to the 《Yield》 shield in front of Fiber-kun. The gaps between shards are the yields.
   function drawPuffs(ctx, now) {
     const L = breathLine(now);
-    const shieldX = HERO.homeX + HERO.size + PX;
-    const stop = Math.max(0, (L.mx - shieldX) / Math.max(1, L.mx - L.tx)) * L.len;
+    // the 《Yield》 shield (shield_yield, a ⏸ on it), held in front of Fiber-kun
+    const sh = packCanvas('shield_yield');
+    const shX = heroX(now) + HERO.size - 2 * PX;
+    const shY = ARENA.groundY - HERO.size + 3 * PX;
+    const stop = Math.max(0, (L.mx - (shX + sh.width)) / Math.max(1, L.mx - L.tx)) * L.len;
     for (const p of g.puffs) {
-      const u = (now - p.t0) / PUFF_MS;
-      const d = u * stop;
+      const d = (now - p.t0) * SHARD_SPEED;
+      if (d > stop) continue;
       const cx = L.mx + L.ux * d;
       const cy = L.my + L.uy * d;
-      const r = 1; // small shards: several in flight read as a dotted stream (gaps = yields)
-      for (let i = -r; i <= r; i++) {
-        for (let j = -r; j <= r; j++) {
-          if (i * i + j * j > r * r + 1) continue;
-          ctx.globalAlpha = 1 - u * 0.4;
-          ctx.fillStyle = i === 0 && j === 0 ? '#ffffff' : (i + j) % 2 ? '#5fc9e8' : '#aef0ff';
-          ctx.fillRect(Math.round((cx + i * PX) / PX) * PX, Math.round((cy + j * PX) / PX) * PX, PX, PX);
-        }
+      // one small ice shard (a pixel diamond); shards from separate slices stay apart
+      for (const [i, j] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        ctx.fillStyle = i === 0 && j === 0 ? '#ffffff' : j === 0 ? '#aef0ff' : '#5fc9e8';
+        ctx.fillRect(Math.round((cx + i * PX) / PX) * PX, Math.round((cy + j * PX) / PX) * PX, PX, PX);
       }
     }
-    ctx.globalAlpha = 1;
-    // the 《Yield》 shield: a pixel shield held in front of Fiber-kun, a pause sign on it
-    const sh = spriteCanvas(SHIELD, SHIELD_PALETTE, PX);
-    const sy = ARENA.groundY - HERO.size + PX;
-    ctx.drawImage(sh, shieldX - PX, sy);
+    ctx.drawImage(sh, shX, shY);
     ctx.font = '32px DotGothic16';
     ctx.fillStyle = '#05071a';
-    ctx.fillText('《Yield》', shieldX - PX + sh.width / 2 + 3, sy - 24 + 3);
+    ctx.fillText('《Yield》', shX + sh.width / 2 + 3, shY - 24 + 3);
     ctx.fillStyle = '#34e0a1';
-    ctx.fillText('《Yield》', shieldX - PX + sh.width / 2, sy - 24);
+    ctx.fillText('《Yield》', shX + sh.width / 2, shY - 24);
   }
+
 
   // ---------- end-of-round scene, readable without text or sound ----------
   function drawEnding(ctx, now, r) {
@@ -1059,23 +1004,23 @@ export function createGame(els) {
       grad.addColorStop(1, 'rgba(255, 120, 40, 0.15)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, ARENA.w, ARENA.groundY);
-      for (let h = 0; h < PERCHES.length; h++) {
+      for (let h = 0; h < SMOKE_SPOTS.length; h++) {
         for (let k = 0; k < 7; k++) {
           const t = ((now / 18 + k * 60 + h * 37) % 420) / 420;
           ctx.fillStyle = `rgba(40, 32, 48, ${0.7 * (1 - t)})`;
-          const sx = PERCHES[h].cx - 12 + Math.sin(t * 6 + h) * 18 + t * 60;
-          ctx.fillRect(Math.round(sx / PX) * PX, Math.round((ROOF_TOP - 24 - t * 420) / PX) * PX, 2 * PX, 2 * PX);
+          const sx = SMOKE_SPOTS[h] - 12 + Math.sin(t * 6 + h) * 18 + t * 60;
+          ctx.fillRect(Math.round(sx / PX) * PX, Math.round((CASTLE.y - t * 260) / PX) * PX, 2 * PX, 2 * PX);
         }
       }
     }
     if (r.rank === 'S' && !r.questFailed) {
       // Fireworks: fixed positions, a new burst every 450 ms.
       const spots = [
-        [260, 200, '#ffd166'],
-        [560, 140, '#34e0a1'],
-        [860, 190, '#ff9fb2'],
-        [420, 260, '#4cc9f0'],
-        [720, 250, '#ffd166'],
+        [200, 170, '#ffd166'],
+        [380, 110, '#34e0a1'],
+        [1240, 140, '#ff9fb2'],
+        [1400, 240, '#4cc9f0'],
+        [1600, 120, '#ffd166'],
       ];
       for (let k = 0; k < spots.length; k++) {
         const t = (age + k * 180) % 900;
@@ -1091,31 +1036,8 @@ export function createGame(els) {
         ctx.globalAlpha = 1;
       }
     }
-    const title = r.questFailed ? 'QUEST FAILED' : { S: 'PERFECT', A: 'GREAT!', B: 'CLEAR', C: 'QUEST FAILED' }[r.rank];
-    const color = r.questFailed ? '#ff5d73' : r.rank === 'S' ? '#ffd166' : '#ffffff';
-    const pop = Math.min(1, age / 250);
-    ctx.font = `${Math.round(110 * (0.7 + 0.3 * pop))}px DotGothic16`;
-    ctx.fillStyle = '#05071a';
-    ctx.fillText(title, ARENA.w / 2 + 6, 140 + 6);
-    ctx.fillStyle = color;
-    ctx.fillText(title, ARENA.w / 2, 140);
+    // The title is on the result card (centre of the sky); the scene says the rest.
   }
-}
-
-function drawBrokenSword(ctx, x, y) {
-  // hilt with a short broken blade, and the rest of the blade lying on the ground
-  ctx.fillStyle = '#8a5a2b';
-  ctx.fillRect(x - 24, y - 6, 24, 12);
-  ctx.fillStyle = '#ffd166';
-  ctx.fillRect(x, y - 18, 12, 36);
-  ctx.fillStyle = '#120c2c';
-  ctx.fillRect(x + 12, y - 8, 40, 16);
-  ctx.fillStyle = '#e8ecff';
-  ctx.fillRect(x + 12, y - 4, 36, 8);
-  ctx.fillStyle = '#120c2c';
-  ctx.fillRect(x + 80, ARENA.groundY - 14, 92, 14);
-  ctx.fillStyle = '#e8ecff';
-  ctx.fillRect(x + 84, ARENA.groundY - 10, 84, 8);
 }
 
 function setWidth(el, frac) {

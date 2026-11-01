@@ -1,6 +1,6 @@
 import { Sprite } from '../ui/Sprite.jsx';
 import { FIBER_KUN, PALETTE } from '../sprites/fiberkun.js';
-import { GOBLIN, GOBLIN_PALETTE } from '../sprites/goblin.js';
+import { PACK } from '../sprites/pack.generated.js';
 import { TRUCK, TRUCK_PALETTE } from '../sprites/truck.js';
 import { TORII, TORII_PALETTE } from '../sprites/torii.js';
 import '../styles/story.css';
@@ -28,7 +28,7 @@ const ENTRIES = [
   { icon: [ICONS.alarm, ICON_PAL, 6], name: 'Emergency quest', real: 'SyncLane: a microtask, no Scheduler queue', ids: 'C2' },
   { icon: [ICONS.flag, ICON_PAL, 6], name: 'Expedition', real: 'Transition lane: sliced, interruptible', ids: 'A4 E4' },
   { icon: [ICONS.respawn, ICON_PAL, 6], name: 'RESPAWN AT ROOT', real: 'interrupt: throw away, restart from root', ids: 'B2' },
-  { icon: [GOBLIN[0], GOBLIN_PALETTE, 6], name: 'Goblin', real: 'one keystroke (SyncLane)', ids: 'D2' },
+  { icon: [PACK.goblin_walk1.rows, PACK.goblin_walk1.pal, 4], name: 'Goblin', real: 'one keystroke (SyncLane)', ids: 'D2' },
   { icon: [ICONS.dragon, ICON_PAL, 6], name: 'Dragon', real: 'the heavy list render', ids: 'A4 E4 F1' },
 ];
 

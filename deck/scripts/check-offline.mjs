@@ -91,7 +91,7 @@ async function measureScale(page) {
         const arena = document.querySelector('.boss-arena');
         const grid = document.querySelector('.dragon-grid');
         // Arena H = the arena box (760 px on the 1920×1080 stage); the stage may be scaled.
-        const k = arena ? arena.getBoundingClientRect().width / 1330 : 1;
+        const k = arena ? arena.getBoundingClientRect().width / 1860 : 1;
         return {
           boxes,
           arenaH: arena ? arena.getBoundingClientRect().height / k : null,
@@ -369,7 +369,8 @@ if (args.includes('--record')) {
   const b = bossM?.boxes?.boss || {};
   add('boss dragon / arena H', bossM?.dragonH && bossM?.arenaH ? bossM.dragonH / bossM.arenaH : null, 0.55, 0.65);
   add('boss Fiber-kun / arena H', b.hero && bossM?.arenaH ? b.hero.h / bossM.arenaH : null, 0.22, 0.26);
-  add('boss goblin / arena H', b.goblin && bossM?.arenaH ? b.goblin.h / bossM.arenaH : null, 0.1, 0.13);
+  add('boss goblin / arena H', b.goblin && bossM?.arenaH ? b.goblin.h / bossM.arenaH : null, 0.18, 0.24);
+  add('boss castle / arena H', b.castle && bossM?.arenaH ? b.castle.h / bossM.arenaH : null, 0.33, 0.4);
   report.scaleInPage = rows;
   for (const r of rows) if (!r.ok) problems.push(`scale bible (in page): ${r.name} = ${r.value}, allowed ${r.min}–${r.max}`);
 }

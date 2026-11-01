@@ -2,11 +2,10 @@
 
 ## Boss dragon pixel art
 - **Source:** Saman Abbasi's own boss-sprite pack (`assets-src/boss-sprites/`). It was drawn in code with Python/PIL, from the seeded scripts in `assets-src/boss-sprites/src/`. No AI image model was used.
-- **Used in the deck:** only the dragon poses `dragon_idle`, `anticipation`, `breath`, `hurt`, `kneel` and `defeated`, plus the round 2/3 palette swaps (`palette_swaps.json`).
-- **How it gets in:** `scripts/gen-sprites.py` turns the PNGs into `src/sprites/pack.generated.js`.
-- **Scaling:** integer ×12, the same pixel grid as Fiber-kun and the goblins.
-- **Not used:** the pack's goblins, castle, sword, slash arc, shield, ice cone and arena art. Saman chose to keep the deck's own versions; those files stay in `assets-src` as the source.
+- **Used in the deck (boss room):** dragon poses and palette swaps, castle (intact / cracked / burning, 2 flame frames), goblins (walk ×2, bite, dance, hit), sword (ready / up / strike), slash arc, 《Yield》 shield, arena background (sky, moon, hills, grass) and the cave-mouth frame. The bestiary icon for the goblin also comes from the pack.
+- **How it gets in:** `scripts/gen-sprites.py` turns the PNGs into `src/sprites/pack.generated.js`; `src/sprites/pack.js` draws them at integer ×12.
+- **Not used:** the pack's ice cone (the deck draws its own ice beam on the same ×12 grid, aimed at Fiber-kun) and fire1/fire2 (the castle's burning frames already have flames).
 
 ## Everything else
-- **Fiber-kun, goblins, castle, truck, torii and Tehran:** drawn in code for this deck (`src/sprites/`, `src/demo/game.js`).
+- **Fiber-kun, truck, torii and Tehran:** drawn in code for this deck (`src/sprites/`).
 - **Fonts:** SIL OFL 1.1. See `LICENSES.md`.

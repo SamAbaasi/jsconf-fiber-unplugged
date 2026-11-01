@@ -13,7 +13,7 @@
   position: absolute;
   left: 30px;
   top: 110px;
-  width: 1330px;
+  width: 1860px;
   height: 760px;
   overflow: hidden;
   border: 5px solid var(--win-line);
@@ -21,7 +21,7 @@
   box-shadow: 0 0 0 5px var(--win-edge);
   will-change: transform;
 }
-.boss-layer { position: absolute; left: 0; top: 0; width: 1330px; height: 760px; }
+.boss-layer { position: absolute; left: 0; top: 0; width: 1860px; height: 760px; }
 .boss-fx { pointer-events: none; }
 
 .boss-hydra { position: absolute; transform-origin: 50% 100%; transition: transform 1.2s ease-in, opacity 1.2s ease-in; }
@@ -46,11 +46,12 @@
 .dragon-grid i { display: block; }
 /* Same cells, same work; only the colors change per form. */
 
-.boss-timer { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); padding: 0 16px; font-size: 44px; color: #fff; background: rgba(5, 7, 26, 0.7); border-radius: 8px; }
+.boss-timer { position: absolute; left: 560px; top: 104px; padding: 0 16px; font-size: 44px; color: #fff; background: rgba(5, 7, 26, 0.7); border-radius: 8px; }
 
 .hud { position: absolute; top: 16px; width: 440px; padding: 8px 14px 10px; background: rgba(5, 7, 26, 0.78); border: 4px solid var(--win-line); border-radius: 10px; }
 .hud-fk { left: 16px; }
-.hud-boss { right: 16px; width: 470px; }
+.hud-boss { left: 700px; top: 100px; width: 470px; } /* top centre: the moon (top right) stays visible */
+.boss-arena.is-ready .hud, .boss-arena.is-ready .boss-timer { opacity: 0; }
 .hud-name { font-size: 36px; line-height: 1.1; color: #fff; }
 .hud-boss .hud-name { color: var(--rank-a); }
 .hud-bar { height: 26px; margin: 6px 0; background: #2a1030; border: 3px solid #fff; }
@@ -61,7 +62,8 @@
 .hud-respawn { color: #9af5ea; }
 .hud-sub { color: var(--dim); }
 
-.boss-overlay { position: absolute; left: 1385px; top: 84px; width: 505px; height: 966px; z-index: 5; display: none; }
+/* READY / RESULT card: in the sky between the castle and the dragon, above Fiber-kun. */
+.boss-overlay { position: absolute; left: 450px; top: 196px; width: 760px; max-height: 420px; z-index: 5; display: none; overflow: hidden; }
 .boss-overlay.is-ready,
 .boss-overlay.is-result {
   display: block;
@@ -71,7 +73,7 @@
   border-radius: 12px;
   box-shadow: 0 0 0 6px #05071a;
 }
-.bo-title { font-size: 72px; line-height: 1.05; color: #fff; }
+.bo-title { font-size: 64px; line-height: 1.05; color: #fff; }
 .bo-mode { font-size: 34px; white-space: nowrap; color: var(--muted); }
 .bo-sub { font-size: 32px; color: var(--muted); }
 .tier-S { border-color: var(--rank-s) !important; box-shadow: 0 0 0 6px #05071a, 0 0 60px rgba(255, 209, 102, 0.6) !important; }
@@ -82,37 +84,42 @@
 .tier-C .bo-title { color: #b8b8c2; }
 .bo-continue { margin-top: 6px; font-size: 44px; color: #e8e8ee; }
 .bo-continue b { font-weight: 400; color: var(--rank-a); }
-.bo-rules { margin: 18px 0; font-size: 42px; line-height: 1.5; }
+.bo-rules { margin: 8px 0; font-size: 33px; line-height: 1.35; white-space: nowrap; }
 .bo-rules b { color: #fff; font-weight: 400; }
 .bo-rules b.r { color: var(--rank-a); }
 .bo-rules b.g { color: var(--rank-d); }
-.bo-start { margin-top: 24px; font-size: 44px; color: var(--rank-s); }
+.bo-start { margin-top: 4px; font-size: 36px; color: var(--rank-s); }
 .bo-res { display: flex; justify-content: space-between; align-items: center; gap: 30px; }
-.bo-rank { display: flex; flex-direction: column; align-items: center; font-size: 150px; line-height: 0.95; }
+.bo-rank { display: flex; flex-direction: column; align-items: center; font-size: 110px; line-height: 0.95; }
 .bo-rank span { font-size: 40px; }
 .bo-rank.rank-S { color: var(--rank-s); }
 .bo-rank.rank-A { color: var(--rank-a); }
 .bo-rank.rank-B { color: var(--rank-b); }
 .bo-rank.rank-C { color: var(--rank-e); }
-.bo-line { margin-top: 18px; font-size: 36px; color: var(--rank-s); }
+.bo-line { margin-top: 8px; font-size: 34px; color: var(--rank-s); }
 .bo-rule { margin-top: 18px; font-size: 28px; color: var(--muted); }
 
-.boss-input { position: absolute; left: 30px; top: 896px; width: 1330px; height: 150px; display: flex; align-items: center; gap: 22px; padding: 20px 28px; }
-.boss-input-label { font-size: 40px; color: var(--rank-s); white-space: nowrap; }
-.boss-input-field { flex: 1; min-width: 0; font: 56px var(--font-code); color: var(--ink); background: #070b26; border: 4px solid var(--muted); border-radius: 8px; padding: 2px 16px; outline: none; }
+.boss-input { position: absolute; left: 30px; top: 896px; width: 830px; height: 150px; display: flex; align-items: center; gap: 22px; padding: 20px 28px; }
+.boss-input-label { font-size: 34px; color: var(--rank-s); white-space: nowrap; }
+.boss-input-field { flex: 1; min-width: 330px; font: 56px var(--font-code); color: var(--ink); background: #070b26; border: 4px solid var(--muted); border-radius: 8px; padding: 2px 16px; outline: none; }
 .boss-input-field:focus { border-color: var(--rank-s); }
 .boss-hits { font-size: 32px; color: var(--muted); white-space: nowrap; }
 .boss-hits b { color: #7dffc8; font-weight: 400; }
-.boss-pending { width: 170px; font-size: 32px; color: var(--rank-d); }
+.boss-pending { min-width: 0; font-size: 32px; color: var(--rank-d); }
 
 .boss-code-line { margin-left: 24px; font-family: var(--font-code); font-size: 34px; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; color: #dfe4ff; white-space: nowrap; }
 .boss-code-line .c { color: #8a90b5; }
 /* Two big numbers, readable from the back row. */
-.boss-big { left: 1385px; width: 505px; padding: 10px 24px; text-align: center; }
-.boss-big-fps { top: 110px; height: 450px; padding-top: 60px; }
-.boss-big-key { top: 590px; height: 460px; padding-top: 60px; }
-.boss-big-label { font-size: 56px; color: var(--muted); }
-.boss-big-num { font-size: 130px; line-height: 1.1; color: #fff; }
+.boss-big { top: 896px; height: 150px; padding: 8px 24px; display: flex; align-items: center; gap: 22px; }
+.boss-big-fps { left: 880px; width: 370px; }
+.boss-big-key { left: 1270px; width: 620px; }
+.boss-big-side { display: flex; flex-direction: column; gap: 6px; }
+.boss-big-label { font-size: 36px; color: var(--muted); white-space: nowrap; }
+.boss-big-num { margin-left: auto; font-size: 110px; line-height: 1; color: #fff; white-space: nowrap; }
+.boss-inp { font-size: 28px; line-height: 1.15; width: 190px; color: var(--muted); }
+.boss-inp[data-level='good'], .bo-key i.inp-good { color: var(--rank-d); }
+.boss-inp[data-level='warn'], .bo-key i.inp-warn { color: var(--rank-s); }
+.boss-inp[data-level='bad'], .bo-key i.inp-bad { color: var(--rank-a); }
 .boss-fps-num { color: var(--rank-d); }
 .boss-fps-num[data-level='warn'] { color: var(--rank-s); }
 .boss-fps-num[data-level='bad'] { color: var(--rank-a); }
@@ -129,9 +136,9 @@
 .boss-calib.is-on {
   display: block;
   position: absolute;
-  left: 1385px;
+  left: 1185px;
   top: 110px;
-  width: 505px;
+  width: 705px;
   height: 940px;
   z-index: 8;
   padding: 24px 30px;
@@ -160,11 +167,12 @@
 .bo-phase { font-size: 26px; color: #c9cdf5; margin-top: 10px; line-height: 1.3; }
 .bc-why { font-size: 20px; color: #c9cdf5; }
 
-.bo-key { margin-top: 40px; display: flex; flex-direction: column; align-items: center; }
-.bo-key span { font-size: 48px; color: var(--muted); }
-.bo-key b { font-size: 140px; font-weight: 400; line-height: 1.1; }
+.bo-key { margin-top: 14px; display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+.bo-key span { font-size: 32px; color: var(--muted); }
+.bo-key b { font-size: 84px; font-weight: 400; line-height: 1.05; }
+.bo-key i { font-style: normal; font-size: 30px; }
 .bo-key b.bad { color: var(--rank-a); }
 .bo-key b.good { color: var(--rank-d); }
-.bo-mode { display: block; font-size: 44px; color: var(--muted); }
+.bo-mode { display: block; font-size: 34px; color: var(--muted); }
 
 /* Dragon colours (and lighter search hits) come from the pack: dragonCss() in demo/dragon.js. */

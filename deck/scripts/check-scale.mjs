@@ -8,7 +8,8 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { scaleReport, SCALES, bbox } from '../src/sprites/scale.js';
 import { FIBER_KUN, DEV, BAG, COFFEE, PALETTE } from '../src/sprites/fiberkun.js';
-import { GOBLIN, GOBLIN_PALETTE } from '../src/sprites/goblin.js';
+import { PACK } from '../src/sprites/pack.generated.js';
+const packPal = (n) => Object.fromEntries(Object.entries(PACK[n].pal));
 import { TRUCK, TRUCK_PALETTE } from '../src/sprites/truck.js';
 import { TORII, TORII_PALETTE } from '../src/sprites/torii.js';
 import { makeDragon, DRAGON_COLORS, ART_PX } from '../src/demo/dragon.js';
@@ -34,7 +35,8 @@ if (process.argv.includes('--lineup')) {
     { group: 'world', label: 'reborn ×8', frame: FIBER_KUN.idle[0], pal: PALETTE, scale: SCALES.world },
     { group: 'world', label: `truck ×${SCALES.truck}`, frame: TRUCK, pal: TRUCK_PALETTE, scale: SCALES.truck },
     { group: 'world', label: `torii ×${SCALES.torii}`, frame: TORII, pal: TORII_PALETTE, scale: SCALES.torii },
-    { group: 'boss', label: `goblin ×${SCALES.boss.goblin}`, frame: GOBLIN[0], pal: GOBLIN_PALETTE, scale: SCALES.boss.goblin },
+    { group: 'boss', label: `castle ×${SCALES.boss.castle}`, frame: PACK.castle_intact.rows, pal: packPal('castle_intact'), scale: SCALES.boss.castle },
+    { group: 'boss', label: `goblin ×${SCALES.boss.goblin}`, frame: PACK.goblin_walk1.rows, pal: packPal('goblin_walk1'), scale: SCALES.boss.goblin },
     { group: 'boss', label: `Fiber-kun ×${SCALES.boss.hero}`, frame: FIBER_KUN.idle[0], pal: PALETTE, scale: SCALES.boss.hero },
     { group: 'boss', label: `dragon ${SCALES.boss.dragonH} px`, dragon: { cols: d.cols, rows: d.rows, shape: d.shape }, scale: dragonCell },
   ].map((it) => (it.frame ? { ...it, box: bbox(it.frame) } : it));
@@ -48,7 +50,7 @@ if (process.argv.includes('--lineup')) {
   // ruler: every 64 px (= half of Fiber-kun at world scale)
   for (let y = 0; y <= 800; y += 64) { g.fillStyle = y % 128 ? '#3b3f7a' : '#6b70b0'; g.fillRect(70, base - y, 3420, 1); g.fillStyle = '#c9cdf5'; g.fillText(String(y), 8, base - y + 7); }
   g.fillStyle = '#ffd166'; g.fillRect(70, base - H, 3420, 2); g.fillText('boss arena H = ' + H + ' px', 2200, base - H - 10);
-  for (const p of [[0.55, 0.65, 'dragon'], [0.22, 0.26, 'Fiber-kun'], [0.10, 0.13, 'goblin']]) { g.fillStyle = 'rgba(52,224,161,0.12)'; g.fillRect(2080, base - H * p[1], 1400, H * (p[1] - p[0])); g.fillStyle = '#34e0a1'; g.fillText(p[2] + ' ' + Math.round(p[0] * 100) + '–' + Math.round(p[1] * 100) + '% of H', 1870, base - H * p[1] + 22); }
+  for (const p of [[0.55, 0.65, 'dragon'], [0.33, 0.4, 'castle'], [0.22, 0.26, 'Fiber-kun'], [0.18, 0.24, 'goblin']]) { g.fillStyle = 'rgba(52,224,161,0.12)'; g.fillRect(2080, base - H * p[1], 1400, H * (p[1] - p[0])); g.fillStyle = '#34e0a1'; g.fillText(p[2] + ' ' + Math.round(p[0] * 100) + '–' + Math.round(p[1] * 100) + '% of H', 1870, base - H * p[1] + 22); }
   const draw = (frame, pal, scale, x, box) => { frame.forEach((row, y) => { for (let i = 0; i < row.length; i++) { const c = pal[row[i]]; if (!c) continue; g.fillStyle = c; g.fillRect(x + (i - box.x) * scale, base - (box.y + box.h - y) * scale, scale, scale); } }); };
   let x = 150; let lastGroup = 'world';
   g.fillStyle = '#ffffff'; g.font = 'bold 26px monospace'; g.fillText('WORLD SCENES (cold open, title close-up is ×12)', 110, 40);

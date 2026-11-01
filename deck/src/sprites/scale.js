@@ -3,7 +3,7 @@
 // Stage = 1920×1080. Fiber-kun is 16×16 and always drawn at an integer scale,
 // the same scale everywhere inside one scene.
 import { FIBER_KUN, DEV } from './fiberkun.js';
-import { GOBLIN } from './goblin.js';
+import { PACK } from './pack.generated.js';
 import { TRUCK } from './truck.js';
 import { TORII } from './torii.js';
 import { SHAPE_ROWS_USED, SHAPE_COLS_USED } from '../demo/dragon.js';
@@ -16,7 +16,8 @@ export const SCALES = {
   boss: {
     arenaH: 760, // boss arena height H, px
     hero: 12, // Fiber-kun in the arena
-    goblin: 12, // 8×8 goblin on the same ×12 grid as Fiber-kun
+    goblin: 12, // the pack's 14×15 goblin on the same ×12 grid as Fiber-kun
+    castle: 12, // the pack's 34×35 castle (stone rows 11–34), ×12
     dragonH: SHAPE_ROWS_USED * 12, // the pack dragon's drawn height: 41 used rows on the same ×12 grid = 492 px
   },
 };
@@ -28,7 +29,8 @@ export const RANGES = {
   toriiHeight: [3, 4],
   bossDragon: [0.55, 0.65], // × arena H
   bossHero: [0.22, 0.26],
-  bossGoblin: [0.1, 0.13],
+  bossGoblin: [0.18, 0.24], // pack goblin, made bigger to read from the back (README: ≈ 20%)
+  bossCastle: [0.33, 0.4], // stone only (README: ≈ 36%; ≈ 43% with the flames)
   worldHero: [128, 128], // px
 };
 
@@ -63,7 +65,8 @@ export function scaleReport() {
   const truck = px(TRUCK, s.truck);
   const torii = px(TORII, s.torii);
   const bossHero = px(FIBER_KUN.idle[0], s.boss.hero);
-  const goblin = px(GOBLIN[0], s.boss.goblin);
+  const goblin = px(PACK.goblin_walk1.rows, s.boss.goblin);
+  const castle = px(PACK.castle_intact.rows, s.boss.castle);
   const H = s.boss.arenaH;
   const row = (scene, name, value, [min, max], unit = '×') => ({ scene, name, value: Math.round(value * 1000) / 1000, min, max, unit, ok: value >= min - 1e-9 && value <= max + 1e-9 });
   return [
@@ -75,6 +78,7 @@ export function scaleReport() {
     row('boss', 'dragon height / arena H', s.boss.dragonH / H, RANGES.bossDragon),
     row('boss', 'Fiber-kun height / arena H', bossHero.h / H, RANGES.bossHero),
     row('boss', 'goblin height / arena H', goblin.h / H, RANGES.bossGoblin),
+    row('boss', 'castle height / arena H', castle.h / H, RANGES.bossCastle),
   ];
 }
 

@@ -3,7 +3,7 @@
 // component (one fiber) that takes the colour of the art pixel under its centre. With 6 px cells
 // (2 × 2 per art pixel) that is 132 × 92 = 12,144 cells. The other poses (breath, hurt, kneel,
 // defeated) are drawn on the canvas while the grid is hidden.
-import { PACK, PACK_META } from '../sprites/pack.generated.js';
+import { PACK, PACK_META, packCanvas } from '../sprites/pack.js';
 
 export const ART_PX = 12;
 const IDLE = PACK.dragon_idle;
@@ -110,25 +110,6 @@ export function dragonCss() {
 
 // The other poses (anticipation, breath, hurt, kneel, defeated), drawn on a canvas in the round's
 // colours. The breath is ice in every round.
-const poseCache = new Map();
 export function poseCanvas(pose, formIndex) {
-  const key = `${pose}:${formIndex}`;
-  if (poseCache.has(key)) return poseCache.get(key);
-  const art = PACK[`dragon_${pose}`];
-  const swap = SWAPS[formIndex] || {};
-  const c = document.createElement('canvas');
-  c.width = art.w * ART_PX;
-  c.height = art.h * ART_PX;
-  const g = c.getContext('2d');
-  art.rows.forEach((row, y) => {
-    for (let x = 0; x < row.length; x++) {
-      const ch = row[x];
-      if (ch === '.') continue;
-      const col = art.pal[ch];
-      g.fillStyle = swap[col] || col;
-      g.fillRect(x * ART_PX, y * ART_PX, ART_PX, ART_PX);
-    }
-  });
-  poseCache.set(key, c);
-  return c;
+  return packCanvas(`dragon_${pose}`, { scale: ART_PX, swap: SWAPS[formIndex], swapKey: String(formIndex) });
 }
