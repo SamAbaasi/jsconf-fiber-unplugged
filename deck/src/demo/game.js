@@ -118,8 +118,11 @@ const GOBLIN_GONE_MS = Math.round(320 * VIS); // …and is gone
 const GOBLIN_SLASH_MS = Math.round(260 * VIS); // Fiber-kun's turn-and-cut
 const BITE_TEXT_MS = 1500; // "BITE! N ms late" stays this long
 const FLOATER_MS = Math.round(900 * VIS); // -N / FINISH! at the dragon
-// After the final hit lands: the dragon falls, then a pause, then the result card.
+// After the final hit lands (on screen): the dragon falls, then a pause, then the result card.
 const RESULT_AFTER_MS = 900 + 800;
+// The round's MEASURED end: this long after the final list commit, as in c9f824e (where it was
+// the contact time of a dash: 90 + 80 / 2 ms). It does not wait for the animation queue below.
+const MEASURE_END_MS = 130;
 // Contact: the middle of the slash, when the crescent is at the chest.
 const IMPACT_AT = DASH_MS + Math.round(SLASH_MS / 2);
 // Where smoke rises when the castle burns (the flames of castle_burning).
@@ -179,11 +182,13 @@ function freshRound() {
     frameTimes: [],
     thrown: 0,
     commits: 0,
-    impacts: [], // dragon hits waiting for their contact frame
+    queue: [], // Fiber-kun's actions waiting to play (visual only): { kind: 'dash' | 'goblin', … }
+    finishPendingAt: 0, // the measured end of the round (final commit + MEASURE_END_MS)
+    respawnAt: -1e9, // the last thrown-away render (RESPAWN AT ROOT)
     sparks: [],
     floaters: [],
     headLog: [],
-    action: null, // { kind: 'dash' | 'goblin' | 'respawn', t0 }
+    action: null, // the action playing now: { kind: 'dash' | 'goblin', t0, … }
     attempting: false,
     hurtUntil: 0,
     kbUntil: 0,
@@ -299,13 +304,7 @@ export function createGame(els) {
     g.phase = 'finishing';
     g.finishAt = now;
     g.outcome = outcome;
-    // The dragon falls whenever the list really showed the last keystroke (it did render).
-    if (outcome === 'WIN') {
-      g.fallAt = now;
-      // The village already fell: the dragon is beaten but only kneels (no victory picture).
-      g.fallPose = g.fallen ? 'kneel' : 'defeated';
-      if (els.hydra) els.hydra.classList.add('is-collapsed'); // the canvas draws the fallen pose
-    }
+    // The dragon falls when the final hit lands on screen (see the action queue in frame()).
   }
 
   function end(now) {
@@ -416,13 +415,30 @@ export function createGame(els) {
 
   function scheduleDragonHit(now, seq, final) {
     if (g.finalScheduled) return;
-    if (final) g.finalScheduled = true;
+    if (final) {
+      g.finalScheduled = true;
+      g.finishPendingAt = now + MEASURE_END_MS; // the measured end does not wait for the animation
+    }
     let hp = dragonHpFor(seq);
     if (!final) hp = Math.max(1, hp); // only the final commit can kill it
     const dmg = Math.max(0, g.dragonHpScheduled - hp);
     g.dragonHpScheduled = hp;
-    g.action = { kind: 'dash', t0: now };
-    g.impacts.push({ at: now + IMPACT_AT, hp, dmg, final });
+    queueAction({ kind: 'dash', hp, dmg, final });
+  }
+
+  // Add an action for Fiber-kun, or merge it into a waiting one of the same kind.
+  function queueAction(act) {
+    const waiting = g.queue.find((q) => q.kind === act.kind);
+    if (!waiting) {
+      g.queue.push(act);
+      return;
+    }
+    if (act.kind === 'goblin') waiting.gbs.push(...act.gbs);
+    else {
+      waiting.hp = act.hp;
+      waiting.dmg += act.dmg;
+      waiting.final = waiting.final || act.final;
+    }
   }
 
   return {
@@ -508,7 +524,7 @@ export function createGame(els) {
     onDiscard(t) {
       if (g.phase !== 'fight' || t < g.startAt) return;
       g.thrown++;
-      g.action = { kind: 'respawn', t0: performance.now() };
+      g.respawnAt = performance.now();
       play('respawn');
     },
     // A real Scheduler slice of the list render ended (rounds 2–3): one ice shard.
@@ -570,10 +586,10 @@ export function createGame(els) {
           // The village falls once the bite ratio is reached (with enough keys to judge).
           if (!g.fallen && g.resolved >= RULES.minKeys && g.bites / g.resolved >= RULES.failRatio) g.fallen = true;
           if (!late) {
-            gb.state = 'dying';
-            // Do not cancel a dash on the dragon that is already under way.
-            const a = g.action;
-            if (!(a && a.kind === 'dash' && now - a.t0 < DASH_MS + SLASH_MS + RETURN_MS)) g.action = { kind: 'goblin', t0: now };
+            // On time: Fiber-kun will cut it. It waits for its turn in the action queue (visual
+            // only; its latency is already measured above).
+            gb.state = 'queued';
+            queueAction({ kind: 'goblin', gbs: [gb] });
           }
         }
         // The goblin runs to the castle; at contact it bites (smoke, the castle cracks).
@@ -608,30 +624,55 @@ export function createGame(els) {
       }
       g.goblins = g.goblins.filter((gb) => gb.state !== 'dead');
 
-      // Dragon hits land at their contact frame: flash, knockback, spark, number, HP.
-      for (const imp of g.impacts) {
-        if (imp.done || now < imp.at) continue;
-        imp.done = true;
-        logHit(imp.final ? 'dragon-final' : 'dragon', now);
-        g.dragonHp = imp.hp;
+      // The measured end of the round: the final list commit + MEASURE_END_MS (same as c9f824e).
+      if (g.phase === 'fight' && g.finishPendingAt && now >= g.finishPendingAt) finish(now, 'WIN');
+
+      // Fiber-kun's actions play one after another, each in full, so fast typing stays readable.
+      // Waiting actions of the same kind merge (one slash cuts every goblin waiting; one dash
+      // carries the latest list commit), so the picture is never more than about one action behind.
+      const cur = g.action;
+      const curDone = !cur || now - cur.t0 >= (cur.kind === 'dash' ? DASH_MS + SLASH_MS + RETURN_MS : GOBLIN_SLASH_MS);
+      if (curDone && g.queue.length) {
+        const next = g.queue.shift();
+        next.t0 = now;
+        g.action = next;
+        if (next.kind === 'goblin') {
+          for (const gb of next.gbs) {
+            gb.state = 'dying';
+            gb.t0 = now;
+          }
+        }
+      }
+      // A dash's slash lands at its contact frame: hurt pose, knockback, number, HP.
+      const act = g.action;
+      if (act && act.kind === 'dash' && !act.hit && now - act.t0 >= IMPACT_AT) {
+        act.hit = true;
+        logHit(act.final ? 'dragon-final' : 'dragon', now);
+        g.dragonHp = act.hp;
         g.hurtUntil = now + HURT_MS; // the hurt pose
         g.kbUntil = now + Math.round(130 * VIS);
         g.shake = 8;
         g.shakeAt = now;
-        const late = imp.final && g.fallen;
-        if (imp.dmg > 0 || imp.final)
+        const late = act.final && g.fallen;
+        if (act.dmg > 0 || act.final)
           // above the dragon's shoulder, right of its horns (not on its neck or chest)
-          g.floaters.push({ text: imp.final ? (late ? 'TOO LATE' : 'FINISH!') : `-${imp.dmg}`, x: DRAGON_BOX.x + 21 * ART_PX, y: DRAGON_BOX.y + 20, t0: now, color: imp.final ? (late ? '#a3a9c2' : '#ffd166') : '#7dffc8', size: imp.final ? 72 : 52 });
+          g.floaters.push({ text: act.final ? (late ? 'TOO LATE' : 'FINISH!') : `-${act.dmg}`, x: DRAGON_BOX.x + 21 * ART_PX, y: DRAGON_BOX.y + 20, t0: now, color: act.final ? (late ? '#a3a9c2' : '#ffd166') : '#7dffc8', size: act.final ? 72 : 52 });
         play('hit');
-        if (imp.final) finish(now, 'WIN');
+        if (act.final) {
+          // The dragon falls (it did render the last key). The village already fell: it only kneels.
+          g.fallAt = now;
+          g.fallPose = g.fallen ? 'kneel' : 'defeated';
+          if (els.hydra) els.hydra.classList.add('is-collapsed'); // the canvas draws the fallen pose
+        }
       }
-      g.impacts = g.impacts.filter((imp) => !imp.done);
 
       if (g.phase === 'fight') {
         // A pause never ends a round. Only the key count, Enter/clicker, or the safety net do.
         if (now - g.startAt > RULES.maxRoundMs) finish(now, 'TIME UP');
       }
-      if (g.phase === 'finishing' && now - g.finishAt > RESULT_AFTER_MS) end(now);
+      // The result card: after the final hit has landed on screen and the pause after it (a round
+      // that did not end with the dragon's fall: after the pause from its end).
+      if (g.phase === 'finishing' && now - (g.outcome === 'WIN' ? g.fallAt || Infinity : g.finishAt) > RESULT_AFTER_MS) end(now);
 
       // Jump physics (manual ↑ only). A long frame moves nothing.
       const step = Math.min(dt, 34) / 1000;
@@ -803,7 +844,7 @@ export function createGame(els) {
       let x = GOBLIN_SLOTS[Math.min(slot, GOBLIN_SLOTS.length - 1)];
       let y = ARENA.groundY - GOBLIN_H;
       let alpha = 1;
-      if (gb.state === 'wait') {
+      if (gb.state === 'wait' || gb.state === 'queued') {
         gb.x = x;
         slot++;
       }
@@ -881,11 +922,12 @@ export function createGame(els) {
     const img = spriteCanvas(frame, PALETTE, HERO.scale);
     const hb = bbox(FIBER_KUN.idle[0]);
     reportBox('boss', 'hero', { x: x + hb.x * HERO.scale, y: y + hb.y * HERO.scale, w: hb.w * HERO.scale, h: hb.h * HERO.scale });
-    const blink = a && a.kind === 'respawn' && t < 420 && Math.floor(t / 60) % 2 === 0;
+    const rt = now - g.respawnAt;
+    const blink = rt < 420 && Math.floor(rt / 60) % 2 === 0;
 
     // Respawn at root: a light column and a label.
-    if (a && a.kind === 'respawn' && t < 700) {
-      ctx.globalAlpha = 0.6 * (1 - t / 700);
+    if (rt < 700) {
+      ctx.globalAlpha = 0.6 * (1 - rt / 700);
       ctx.fillStyle = '#9af5ea';
       ctx.fillRect(x + HERO.size / 2 - 32, 0, 64, ARENA.groundY);
       ctx.globalAlpha = 1;
